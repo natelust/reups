@@ -1,0 +1,9 @@
+[package]
+name = "reups"
+version = "0.1.0"
+authors = ["Nate Lust <nlust@astro.princeton.edu>"]
+
+[dependencies]
+clap = "2.31.2"
+regex = "0.2"
+lazy_static = "1.0"
