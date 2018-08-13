@@ -1,23 +1,23 @@
-extern crate regex;
+mod dbfile;
+pub mod graph;
+pub mod table;
+
+use self::dbfile::DBFile;
 
 use std::env;
+use std::fmt;
 use std::fs;
-use std::io;
 use std::path;
 use std::process;
 use std::thread;
 
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::prelude::*;
-use self::regex::Regex;
+
 use std::sync::mpsc;
 
-lazy_static! {
-    static ref KEY_REGEX: Regex = Regex::new(r"(.*) = (.*)").unwrap();
-}
-
+// Implementation of an database object. The outside visible database
+// object, is comprised of some number of instances of these
+// implementations
 struct DBImpl {
     directory: path::PathBuf,
     tag_to_product_info: HashMap<String, HashMap<String, DBFile>>,
@@ -25,25 +25,40 @@ struct DBImpl {
     product_to_tags: HashMap<String, Vec<String>>
 }
 
+// Data structure to hold state related to iterating over a db object.
+// This iteration is used to loop over all the instance of DBImpls
+// contained in the database, which at this point includes the main
+// and user dbs
 struct DBIter<'a> {
     inner: & 'a DB,
     pos: usize
 }
 
+// Implementing the iterator type trait for DBIter so that the stuct
+// can be used in places where iteration happens
 impl<'a> Iterator for DBIter<'a> {
     type Item = & 'a DBImpl;
 
     fn next(& mut self) -> Option<Self::Item> {
+        // Match the position state variable to know where in the
+        // iteration the iterable object is
         match self.pos {
+            // This is the main system db
             0 => {
                 self.pos += 1;
                 Some(&self.inner.system_db)
             },
+            // This corresponds to the user db
+            // This object is already an option, as there may not
+            // be a user db, so this match will either return some
+            // with the user db inside, or None, which will terminate
+            // the iterator
             1 => {
                 self.pos += 1;
                 // user_db is already an option
                 self.inner.user_db.as_ref()
             }
+            // Terminate the iterator if this branch is reached
             _ => {
                 None
             }
@@ -51,10 +66,21 @@ impl<'a> Iterator for DBIter<'a> {
     }
 }
 
+// User visible database
 pub struct DB {
     system_db: DBImpl,
     user_db: Option<DBImpl>,
     stack_root: path::PathBuf
+}
+
+impl fmt::Debug for DB {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Database at {:?}\n", self.system_db.directory)?;
+        if let Some(ref user_db) = self.user_db {
+            write!(f, "User database at {:?}\n", user_db.directory)?;
+        }
+        write!(f, "Stack at {:?}\n", self.stack_root)
+    }
 }
 
 impl DB {
@@ -122,8 +148,8 @@ impl DB {
         }
     }
 
-    pub fn get_table_from_version(& self, product: & String, version: & String) -> Option<path::PathBuf> {
-        let mut tables_vec: Vec<Option<path::PathBuf>> = vec![];
+    pub fn get_table_from_version(& self, product: & String, version: & String) -> Option<table::Table> {
+        let mut tables_vec: Vec<Option<(path::PathBuf, path::PathBuf)>> = vec![];
 
         for db in self.iter() {
             let prod_dir = db.product_to_version_info[product][version].entry(& "PROD_DIR".to_string());
@@ -133,28 +159,45 @@ impl DB {
                 continue;
             }
             let mut total = self.stack_root.clone();
-            //let mut product_clone = product.clone().push_str(".table");
             let mut product_clone = product.clone();
             product_clone.push_str(".table");
             total.push(prod_dir.unwrap());
+            let total_only_prod = total.clone();
             total.push(ups_dir.unwrap());
             total.push(product_clone);
-            tables_vec.push(Some(total));
+            tables_vec.push(Some((total_only_prod, total)));
         }
 
         match tables_vec.len() {
-            x if x > 0 => tables_vec.remove(x-1),
+            x if x > 0 => {
+                let (prod_dir, total) = tables_vec.remove(x-1).unwrap();
+                table::Table::new(product.clone(), total, prod_dir).ok()},
             _ => None
         }
     }
 
-    pub fn get_table_from_tag(& self, product: & String, tag: & String) -> Option<path::PathBuf>{
-        // store versions found in the main db and the user db
+    pub fn get_versions_from_tag(& self, product: & String, tag: Vec<& String>) -> Vec<Option<String>> {
+         // store versions found in the main db and the user db
         let mut versions_vec: Vec<Option<String>> = vec![];
         // look up the products
         for db in self.iter() {
-            versions_vec.push(db.tag_to_product_info[tag][product].entry(& "VERSION".to_string()));
+            //let mut tagMap: HashMap<String, DBFile>;
+            let mut version: Option<String> = None;
+            for t in &tag {
+                let ref tag_map = db.tag_to_product_info[t.clone()];
+                if let Some(product_file) = tag_map.get(product) {
+                    version = product_file.entry(& "VERSION".to_string());
+                    break;
+                }
+                //versions_vec.push(db.tag_to_product_info[tag][product].entry(& "VERSION".to_string()));
+            }
+            versions_vec.push(version);
         }
+        versions_vec
+    }
+
+    pub fn get_table_from_tag(& self, product: & String, tag: Vec<& String>) -> Option<table::Table>{
+        let mut versions_vec = self.get_versions_from_tag(product, tag);
         // use the last element, as this will select the user tag if one is present else
         // it will return the result from the main tag
         // it is safe to unwrap here, as there must be at least one db to construct the
@@ -166,6 +209,9 @@ impl DB {
         }
     }
 
+    //pub fn make_dep_graph(product: String) -> graph::Graph {
+    //}
+
     fn iter<'a>(& 'a self) -> DBIter<'a> {
         DBIter {
             inner: self,
@@ -175,58 +221,6 @@ impl DB {
 
 }
 
-struct DBFile {
-    path: path::PathBuf,
-    contents: RefCell<HashMap<String, String>>
-}
-
-impl DBFile {
-    fn new(path: path::PathBuf) -> DBFile {
-        DBFile {
-            path: path,
-            contents: RefCell::new(HashMap::new())
-        }
-    }
-
-    fn entry(& self, key: & String) -> Option<String> {
-        let db_is_empty: bool;
-        {
-            db_is_empty = self.contents.borrow().is_empty();
-        }
-        if db_is_empty {
-            self.load_file().unwrap_or_else(|_e|{
-                println!("Problem accessing {}, could not create database",
-                         self.path.to_str().unwrap());
-                process::exit(1);
-            });
-        }
-        match self.contents.borrow().get(key) {
-           Some(value) => Some(value.clone()),
-           None => None
-        }
-    }
-
-
-    fn load_file(& self) -> Result<(), io::Error> {
-        let mut f = File::open(&self.path)?;
-
-        let mut contents = String::new();
-        f.read_to_string(&mut contents)?;
-        for line in contents.as_str().lines() {
-            let cap = KEY_REGEX.captures(line);
-            match cap {
-                Some(c) => {
-                    self.contents.borrow_mut().insert(String::from(c.get(1).unwrap().as_str().trim()),
-                                                      String::from(c.get(2).unwrap().as_str().trim()));
-                },
-                None => {
-                    continue;
-                }
-            }
-        }
-        Ok(())
-    }
-}
 
 fn build_db(eups_path: String) -> (path::PathBuf,
                                        HashMap<String, HashMap<String, DBFile>>,

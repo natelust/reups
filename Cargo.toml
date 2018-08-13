@@ -7,3 +7,4 @@ authors = ["Nate Lust <nlust@astro.princeton.edu>"]
 clap = "2.31.2"
 regex = "0.2"
 lazy_static = "1.0"
+petgraph = "0.4.11"

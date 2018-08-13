@@ -1,3 +1,4 @@
+extern crate regex;
 mod argparse;
 mod db;
 mod setup;
