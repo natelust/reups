@@ -1,12 +1,14 @@
-extern crate petgraph;
+pub extern crate petgraph;
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use db::DB;
 use db::table;
 use std::fmt;
-use std::process;
+use db::graph::petgraph::visit::Walker;
 
+#[derive(Clone)]
 pub enum NodeType {
     Required,
     Optional
@@ -15,8 +17,8 @@ pub enum NodeType {
 impl fmt::Debug for NodeType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ref Required => write!(f, "Required Node"),
-            ref Optional => write!(f, "Optional Node"),
+            NodeType::Required => write!(f, "Required Node"),
+            NodeType::Optional => write!(f, "Optional Node"),
         }
     }
 }
@@ -26,7 +28,8 @@ pub struct Graph<'a> {
     _graph: petgraph::Graph<NodeType, String>,
     _name_map: HashMap<String, petgraph::graph::NodeIndex<petgraph::graph::DefaultIx>>,
     _index_map: HashMap<petgraph::graph::NodeIndex<petgraph::graph::DefaultIx>, String>,
-    _db:  & 'a DB
+    _db:  & 'a DB,
+    _processed: HashSet<String>
 }
 
 impl<'a> Graph<'a> {
@@ -34,7 +37,11 @@ impl<'a> Graph<'a> {
         Graph{ _graph: petgraph::Graph::<NodeType, String>::new(),
                _name_map: HashMap::new(),
                _index_map: HashMap::new(),
-               _db: db}
+               _db: db,
+               _processed: HashSet::new()}
+    }
+    pub fn get_name(& self, number: petgraph::graph::NodeIndex<petgraph::graph::DefaultIx>) -> String {
+        return self._index_map[&number].clone()
     }
 
     pub fn add_or_update_product(&mut self, name: String, node_type: NodeType) {
@@ -81,13 +88,24 @@ impl<'a> Graph<'a> {
         Ok(())
     }
 
-    /*pub fn add_product_by_tag(& mut self,  product: String, tag: String) {
-        let table = self._db.get_table_from_tag(
+    pub fn add_product_by_tag(& mut self,  product: String,
+                              tag: & Vec<& String>,
+                              version_type: table::VersionType,
+                              node_type: NodeType,
+                              recurse: bool) {
+        let result = self._db.get_table_from_tag(& product, tag.clone());
+        if let Some(table) = result {
+            self.add_table(&table, version_type, node_type, Some(tag), recurse);
+        }
     }
     
-    pub fn add_product_by_version(& mut self, product: String, version: String){
+    pub fn add_product_by_version(& mut self, product: String, version: String,
+                                  version_type: table::VersionType, node_type: NodeType, recurse: bool){
+        let result = self._db.get_table_from_version(& product, & version);
+        if let Some(table) = result {
+            self.add_table(&table, version_type, node_type, None, recurse);
+        }
     }
-    */
 
     pub fn add_table(& mut self,  table: & table::Table,
                      version_type: table::VersionType,
@@ -95,34 +113,55 @@ impl<'a> Graph<'a> {
                      tag: Option<& Vec<& String>>,
                      recurse: bool){
         let top = & table.name;
+        if self._processed.contains(top) {
+            return
+        }
         self.add_or_update_product(top.clone(), node_type);
+
         let dependencies = match version_type {
-            table::VersionType::Exact => table.exact.as_ref().unwrap_or_else(||{
-                let fmt_msg = format!("Error, attempted to look up exact
-                        dependency matches in table file for {}, but no
-                        exact matches found", top).replace("\n", "");
-                println!("{}", fmt_msg);
-                process::exit(1)}),
-            table::VersionType::Inexact => table.inexact.as_ref().unwrap_or_else(||{
-                let fmt_msg = format!("Error, attempted to look up inexact
-                        dependency matches  in table file for {}, but no
-                        inexact matches found", top).replace("\n", "");
-                println!("{}", fmt_msg);
-               process::exit(1)})
+            table::VersionType::Exact => table.exact.as_ref(),
+            table::VersionType::Inexact => table.inexact.as_ref()
         };
-        for (k, v) in dependencies.required.iter() {
-            self.add_or_update_product(k.clone(), NodeType::Required);
-            if let Err(_) = self.connect_products(top, &k, v.clone()) {
-                println!("There was an issue connecting products in the graph");
+        // This means that there are no dependencies of the required type, and so the function
+        // should return.
+        if let None = dependencies {
+            return
+        }
+        // If there are dependencies for the version type, loop over the required and optional
+        // dependencies
+        let dep_unwrap = dependencies.unwrap();
+        for (dep_vec, node_type) in vec![&dep_unwrap.required, &dep_unwrap.optional].iter().zip(
+                                        vec![NodeType::Required, NodeType::Optional]) {
+            /*
+            match node_type {
+                NodeType::Required => println!("working on required for {}", &top),
+                NodeType::Optional => println!("working on optional for {}", &top),
             }
-            match (tag, recurse) {
-                (Some(tagVec), true) => {
-                    match version_type {
-                        table::VersionType::Exact => self.add_product_by_version(k.clone(), v.clone()),
-                        table::VersionType::Inexact => self.add_product_by_
-                    }
-                },
+            */
+            for (k, v) in dep_vec.iter() {
+                self.add_or_update_product(k.clone(), node_type.clone());
+                if let Err(_) = self.connect_products(top, &k, v.clone()) {
+                    println!("There was an issue connecting products in the graph");
+                }
+                
+                match (&version_type, tag, recurse) {
+                    (table::VersionType::Inexact, Some(tag_vec), true) => {
+                        self.add_product_by_tag(k.clone(), tag_vec, table::VersionType::Inexact,
+                                                node_type.clone(), recurse)
+                        },
+                    (table::VersionType::Exact, _, true) => {
+                        self.add_product_by_version(k.clone(), v.clone(), table::VersionType::Exact,
+                                                    node_type.clone(), recurse)
+                        },
+                    _ => {}
+                }
             }
         }
+        self._processed.insert(top.clone());
+    }
+
+    pub fn iter(& self) -> petgraph::visit::WalkerIter<petgraph::visit::Topo<<petgraph::Graph<NodeType, String> as petgraph::visit::GraphBase>::NodeId, <petgraph::Graph<NodeType, String> as petgraph::visit::Visitable>::Map>, &petgraph::Graph<NodeType, String>>{
+        let topo = petgraph::visit::Topo::new(&self._graph);
+        return topo.iter(&self._graph)
     }
 }

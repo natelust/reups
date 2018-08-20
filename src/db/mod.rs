@@ -181,7 +181,6 @@ impl DB {
         let mut versions_vec: Vec<Option<String>> = vec![];
         // look up the products
         for db in self.iter() {
-            //let mut tagMap: HashMap<String, DBFile>;
             let mut version: Option<String> = None;
             for t in &tag {
                 let ref tag_map = db.tag_to_product_info[t.clone()];
@@ -189,7 +188,6 @@ impl DB {
                     version = product_file.entry(& "VERSION".to_string());
                     break;
                 }
-                //versions_vec.push(db.tag_to_product_info[tag][product].entry(& "VERSION".to_string()));
             }
             versions_vec.push(version);
         }
