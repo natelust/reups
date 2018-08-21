@@ -1,11 +1,16 @@
+extern crate fnv;
+
+use self::fnv::FnvHashMap;
+
 use std::env;
-use std::collections::HashMap;
+use std::io;
+use std::io::prelude::*;
 
 use db;
 use table;
 use argparse;
 
-fn setup_table(product_version: &String, product_table: &table::Table, env_vars :& mut HashMap<String, String>) {
+fn setup_table(product_version: &String, product_table: &table::Table, env_vars :& mut FnvHashMap<String, String>) {
     // set the product directory
     let mut prod_dir_label = product_table.name.clone();
     prod_dir_label = prod_dir_label.replace(" ", "_");
@@ -78,17 +83,11 @@ pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::A
                                 Some(&tags),
                                 true);
 
-            /*
-            for node in dep_graph.iter().skip(1){
-                let name = dep_graph.get_name(node);
-                println!("{}, versions {:?}", &name, dep_graph.product_versions(&name));
-            }
-            */
             deps = Some(dep_graph);
         }
         let prod_versions = db.get_versions_from_tag(&name.to_string(), tags.clone());
         // create a hashmap to hold all the environment variables to set
-        let mut env_vars : HashMap<String, String> = HashMap::new();
+        let mut env_vars : FnvHashMap<String, String> = FnvHashMap::default();
         setup_table(prod_versions[0].as_ref().unwrap(), &table.unwrap(), & mut env_vars);
 
         if let Some(dependencies) = deps {

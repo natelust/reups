@@ -1,5 +1,5 @@
+use db::fnv::FnvHashMap;
 use regex::Regex;
-use std::collections::HashMap;
 use std::path;
 use std::io;
 use std::fs::File;
@@ -12,8 +12,11 @@ lazy_static! {
     static ref EXACT_REQUIRED: Regex = Regex::new(r"setupRequired[(](.+)\s+[-]j\s(.+)[)]").unwrap();
     static ref INEXACT_OPTIONAL: Regex = Regex::new(r"setupOptional[(](.+)\s(.+)\s\[").unwrap();
     static ref INEXACT_REQUIRED: Regex = Regex::new(r"setupRequired[(](.+)\s(.+)\s\[").unwrap();
-    static ref ENV_PREPEND: Regex = Regex::new(r"envPrepend[(](.+)[,]\s(.+)[)]").unwrap();
-    static ref ENV_APPEND: Regex = Regex::new(r"envAppend[(](.+)[,]\s(.+)[)]").unwrap();
+    static ref ENV_PREPEND: Regex = Regex::new(r"^envPrepend[(](.+)[,]\s(.+)[)]").unwrap();
+    static ref ENV_APPEND: Regex = Regex::new(r"^envAppend[(](.+)[,]\s(.+)[)]").unwrap();
+    static ref PATH_PREPEND: Regex = Regex::new(r"^pathPrepend[(](.+)[,]\s(.+)[)]").unwrap();
+    static ref PATH_APPEND: Regex = Regex::new(r"^pathAppend[(](.+)[,]\s(.+)[)]").unwrap();
+
 }
 
 pub enum VersionType {
@@ -29,8 +32,8 @@ pub enum EnvActionType {
 
 #[derive(Debug)]
 pub struct Deps {
-    pub required: HashMap<String, String>,
-    pub optional: HashMap<String, String>
+    pub required: FnvHashMap<String, String>,
+    pub optional: FnvHashMap<String, String>
 }
 
 #[derive(Debug)]
@@ -40,7 +43,7 @@ pub struct Table {
     pub product_dir: path::PathBuf,
     pub exact: Option<Deps>,
     pub inexact: Option<Deps>,
-    pub env_var: HashMap<String, (EnvActionType, String)>
+    pub env_var: FnvHashMap<String, (EnvActionType, String)>
 }
 
 impl Table {
@@ -64,13 +67,21 @@ impl Table {
                                     &*INEXACT_REGEX,
                                     &*INEXACT_REQUIRED,
                                     &*INEXACT_OPTIONAL);
-        let mut env_var = HashMap::new();
+        let mut env_var = FnvHashMap::default();
         for line in contents.as_str().lines() {
             let mut tmp_match = ENV_PREPEND.captures(line);
             let mut action_type = EnvActionType::Prepend;
             if let None = tmp_match {
                 tmp_match = ENV_APPEND.captures(line);
                 action_type = EnvActionType::Append
+            }
+            if let None = tmp_match {
+                tmp_match = PATH_PREPEND.captures(line);
+                action_type = EnvActionType::Prepend;
+            }
+            if let None = tmp_match {
+                tmp_match = PATH_APPEND.captures(line);
+                action_type = EnvActionType::Append;
             }
             if let Some(cap) = tmp_match {
                 let var = String::from(cap.get(1).unwrap().as_str());
@@ -90,8 +101,8 @@ impl Table {
         match exact_re {
             Some(caps) => {
                 let temp_string = caps.get(1).unwrap().as_str();
-                let mut required_map = HashMap::new();
-                let mut optional_map = HashMap::new();
+                let mut required_map = FnvHashMap::default();
+                let mut optional_map = FnvHashMap::default();
                 for line in temp_string.lines() {
                     // Check if the line is an option or required
                     let required_re = required_regex.captures(line);

@@ -1,3 +1,6 @@
+extern crate fnv;
+
+use self::fnv::FnvHashMap;
 mod dbfile;
 pub mod graph;
 pub mod table;
@@ -11,7 +14,7 @@ use std::path;
 use std::process;
 use std::thread;
 
-use std::collections::HashMap;
+//use std::collections::HashMap;
 
 use std::sync::mpsc;
 
@@ -20,9 +23,9 @@ use std::sync::mpsc;
 // implementations
 struct DBImpl {
     directory: path::PathBuf,
-    tag_to_product_info: HashMap<String, HashMap<String, DBFile>>,
-    product_to_version_info: HashMap<String, HashMap<String, DBFile>>,
-    product_to_tags: HashMap<String, Vec<String>>
+    tag_to_product_info: FnvHashMap<String, FnvHashMap<String, DBFile>>,
+    product_to_version_info: FnvHashMap<String, FnvHashMap<String, DBFile>>,
+    product_to_tags: FnvHashMap<String, Vec<String>>
 }
 
 // Data structure to hold state related to iterating over a db object.
@@ -221,9 +224,9 @@ impl DB {
 
 
 fn build_db(eups_path: String) -> (path::PathBuf,
-                                       HashMap<String, HashMap<String, DBFile>>,
-                                       HashMap<String, HashMap<String, DBFile>>,
-                                       HashMap<String, Vec<String>>){
+                                       FnvHashMap<String, FnvHashMap<String, DBFile>>,
+                                       FnvHashMap<String, FnvHashMap<String, DBFile>>,
+                                       FnvHashMap<String, Vec<String>>){
     let eups_path = path::PathBuf::from(eups_path);
     // Create channels that each of the threads will communicate over
     let (name_tx, name_rx) = mpsc::channel::<(String, path::PathBuf)>();
@@ -237,9 +240,9 @@ fn build_db(eups_path: String) -> (path::PathBuf,
 
     let names_thread = thread::spawn(move ||{
         // #product -> #version -> struct(path, info)
-        let mut product_hash: HashMap<String, HashMap<String, DBFile>> = HashMap::new();
+        let mut product_hash: FnvHashMap<String, FnvHashMap<String, DBFile>> = FnvHashMap::default();
         for (product, file) in name_rx {
-            let mut version_hash = product_hash.entry(product).or_insert(HashMap::new());
+            let mut version_hash = product_hash.entry(product).or_insert(FnvHashMap::default());
             let mut version;
             // The code below is scoped so that the borrow of file goes out scope and
             // the file can be moved into the DBFile constructor
@@ -255,8 +258,8 @@ fn build_db(eups_path: String) -> (path::PathBuf,
 
     let tags_thread = thread::spawn(move ||{
         // #tag -> #product -> (path, info)
-        let mut tags_hash: HashMap<String, HashMap<String, DBFile>> = HashMap::new();
-        let mut product_to_tags : HashMap<String, Vec<String>> = HashMap::new();
+        let mut tags_hash: FnvHashMap<String, FnvHashMap<String, DBFile>> = FnvHashMap::default();
+        let mut product_to_tags : FnvHashMap<String, Vec<String>> = FnvHashMap::default();
         for (product, file) in tag_rx {
             let mut tag;
             // The code below is scoped so that the borrow of file goes out scope and
@@ -269,7 +272,7 @@ fn build_db(eups_path: String) -> (path::PathBuf,
             }
             let mut tags_vec = product_to_tags.entry(product.clone()).or_insert(Vec::new());
             tags_vec.push(tag.clone());
-            let mut product_hash = tags_hash.entry(tag).or_insert(HashMap::new());
+            let mut product_hash = tags_hash.entry(tag).or_insert(FnvHashMap::default());
             product_hash.insert(product, DBFile::new(file));
         }
         (tags_hash, product_to_tags)

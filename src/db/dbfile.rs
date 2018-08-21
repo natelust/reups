@@ -1,9 +1,9 @@
+use db::fnv::FnvHashMap;
 use std::io;
 use std::path;
 use std::process;
 
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 
@@ -15,14 +15,14 @@ lazy_static! {
 
 pub struct DBFile {
     path: path::PathBuf,
-    contents: RefCell<HashMap<String, String>>
+    contents: RefCell<FnvHashMap<String, String>>
 }
 
 impl DBFile {
     pub fn new(path: path::PathBuf) -> DBFile {
         DBFile {
             path: path,
-            contents: RefCell::new(HashMap::new())
+            contents: RefCell::new(FnvHashMap::default())
         }
     }
 

@@ -1,6 +1,6 @@
 pub extern crate petgraph;
+use db::fnv::FnvHashMap;
 
-use std::collections::HashMap;
 use std::collections::HashSet;
 
 use db::DB;
@@ -26,8 +26,8 @@ impl fmt::Debug for NodeType {
 #[derive(Debug)]
 pub struct Graph<'a> {
     _graph: petgraph::Graph<NodeType, String>,
-    _name_map: HashMap<String, petgraph::graph::NodeIndex<petgraph::graph::DefaultIx>>,
-    _index_map: HashMap<petgraph::graph::NodeIndex<petgraph::graph::DefaultIx>, String>,
+    _name_map: FnvHashMap<String, petgraph::graph::NodeIndex<petgraph::graph::DefaultIx>>,
+    _index_map: FnvHashMap<petgraph::graph::NodeIndex<petgraph::graph::DefaultIx>, String>,
     _db:  & 'a DB,
     _processed: HashSet<String>
 }
@@ -35,8 +35,8 @@ pub struct Graph<'a> {
 impl<'a> Graph<'a> {
     pub fn new(db: & 'a DB) ->  Graph {
         Graph{ _graph: petgraph::Graph::<NodeType, String>::new(),
-               _name_map: HashMap::new(),
-               _index_map: HashMap::new(),
+               _name_map: FnvHashMap::default(),
+               _index_map: FnvHashMap::default(),
                _db: db,
                _processed: HashSet::new()}
     }
@@ -103,7 +103,9 @@ impl<'a> Graph<'a> {
                                   version_type: table::VersionType, node_type: NodeType, recurse: bool){
         let result = self._db.get_table_from_version(& product, & version);
         if let Some(table) = result {
-            self.add_table(&table, version_type, node_type, None, recurse);
+            if !self._processed.contains(&table.name) {
+                self.add_table(&table, version_type, node_type, None, recurse);
+            }
         }
     }
 
@@ -113,9 +115,7 @@ impl<'a> Graph<'a> {
                      tag: Option<& Vec<& String>>,
                      recurse: bool){
         let top = & table.name;
-        if self._processed.contains(top) {
-            return
-        }
+
         self.add_or_update_product(top.clone(), node_type);
 
         let dependencies = match version_type {
@@ -132,12 +132,6 @@ impl<'a> Graph<'a> {
         let dep_unwrap = dependencies.unwrap();
         for (dep_vec, node_type) in vec![&dep_unwrap.required, &dep_unwrap.optional].iter().zip(
                                         vec![NodeType::Required, NodeType::Optional]) {
-            /*
-            match node_type {
-                NodeType::Required => println!("working on required for {}", &top),
-                NodeType::Optional => println!("working on optional for {}", &top),
-            }
-            */
             for (k, v) in dep_vec.iter() {
                 self.add_or_update_product(k.clone(), node_type.clone());
                 if let Err(_) = self.connect_products(top, &k, v.clone()) {
