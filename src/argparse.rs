@@ -33,11 +33,16 @@ fn build_setup<'a, 'b>() -> App<'a, 'b> {
                                .long("inexact"));
 }
 
+fn build_prep<'a, 'b>() -> App<'a, 'b> {
+    return SubCommand::with_name("prep");
+}
+
 pub fn parse_args<'a> () -> ArgMatches<'a> {
     let matches = App::new("Rust Eups").version("0.1")
                            .author("Nate Lust")
                            .about("Dynamic environment management")
-                           .subcommand(build_setup()).get_matches();
+                           .subcommand(build_setup())
+                           .subcommand(build_prep()).get_matches();
     return matches;
 }
 

@@ -5,19 +5,14 @@ fn main() {
 
     match args.subcommand() {
         ("setup", Some(m)) => {
-            /*
-            if m.is_present("deps") {
-                println!("ignore deps");
-            }
-            let product = m.value_of("product");
-            let db = reups::DB::new(None, None, None);
-            if let Some(name) = product {
-                println!("Setting up product {}", name);
-                db.product_versions(&name.to_string());
-            }
-            */
             reups::setup_command(m, &args);
         },
+        ("prep", Some(_)) => {
+            println!(
+"rsetup() {{
+    eval $(reups setup \"$@\");
+}}");
+        }
         _ => println!("{}",args.usage()),
     }
 }

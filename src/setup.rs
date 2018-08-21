@@ -1,25 +1,27 @@
 use std::env;
+use std::collections::HashMap;
 
 use db;
 use table;
 use argparse;
 
-fn setup_table(product_version: &String, product_table: &table::Table) {
-    println!("setting up {}", product_table.name);
+fn setup_table(product_version: &String, product_table: &table::Table, env_vars :& mut HashMap<String, String>) {
     // set the product directory
     let mut prod_dir_label = product_table.name.clone();
     prod_dir_label = prod_dir_label.replace(" ", "_");
     prod_dir_label = prod_dir_label.to_uppercase();
     prod_dir_label.push_str("_DIR");
-    println!("prod_dir_label {}", prod_dir_label);
-    println!("prod_dir_value {}", &product_table.product_dir.to_str().unwrap());
-    env::set_var(prod_dir_label, &product_table.product_dir.as_os_str());
+    env_vars.insert(prod_dir_label, String::from(product_table.product_dir.to_str().unwrap()));
 
     for (k, v) in product_table.env_var.iter(){
-        let existing_var_result = env::var(k);
-        let existing_var = match existing_var_result {
-            Ok(r) => r,
-            Err(_) => String::from("")
+        let mut existing_var = match env_vars.get(k) {
+            Some(existing) => existing.clone(),
+            None => {
+                match env::var(k) {
+                    Ok(r) => r,
+                    Err(_) => String::from("")
+                }
+            }
         };
 
         let output_var = match v {
@@ -31,7 +33,7 @@ fn setup_table(product_version: &String, product_table: &table::Table) {
             }
         };
 
-        env::set_var(k, output_var);
+        env_vars.insert(k.clone(), output_var);
     }
 
 }
@@ -65,7 +67,6 @@ pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::A
         mode = table::VersionType::Inexact;
     }
     if let Some(name) = product {
-        println!("Setting up product {}", name);
         let table = db.get_table_from_tag(&name.to_string(), tags.clone());
         // If someone specified the just flag, don't look up any dependencies
         let mut deps :Option<db::graph::Graph> = None;
@@ -86,7 +87,9 @@ pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::A
             deps = Some(dep_graph);
         }
         let prod_versions = db.get_versions_from_tag(&name.to_string(), tags.clone());
-        setup_table(prod_versions[0].as_ref().unwrap(), &table.unwrap());
+        // create a hashmap to hold all the environment variables to set
+        let mut env_vars : HashMap<String, String> = HashMap::new();
+        setup_table(prod_versions[0].as_ref().unwrap(), &table.unwrap(), & mut env_vars);
 
         if let Some(dependencies) = deps {
             // Skip the root node, as it is what is setup
@@ -98,9 +101,16 @@ pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::A
                 // FINDME
                 let largest_version = versions.iter().max().unwrap();
                 let node_table = db.get_table_from_version(&name, &largest_version).unwrap();
-                setup_table(&largest_version, &node_table);
+                setup_table(&largest_version, &node_table, & mut env_vars);
             }
         }
+        // Process all the environment variables into a string to return
+        let mut return_string = String::from("export ");
+        for (k, v) in env_vars {
+            return_string.push_str([k, v].join("=").as_str());
+            return_string.push_str(" ");
+        }
+        println!("{}", return_string);
     }   
 }
 
