@@ -13,10 +13,8 @@ lazy_static! {
     static ref EXACT_REQUIRED: Regex = Regex::new(r"setupRequired[(](?P<product>.+?)\s+[-]j\s(?P<version>.+?)[)]").unwrap();
     static ref INEXACT_OPTIONAL: Regex = Regex::new(r"setupOptional[(](?P<product>.+?)\s(?P<version>.+?)\s\[").unwrap();
     static ref INEXACT_REQUIRED: Regex = Regex::new(r"setupRequired[(](?P<product>.+?)\s(?P<version>.+?)\s\[").unwrap();
-    static ref ENV_PREPEND: Regex = Regex::new(r"^envPrepend[(](?P<var>.+)[,]\s(?P<target>.+)[)]").unwrap();
-    static ref ENV_APPEND: Regex = Regex::new(r"^envAppend[(](?P<var>.+)[,]\s(?P<target>.+)[)]").unwrap();
-    static ref PATH_PREPEND: Regex = Regex::new(r"^pathPrepend[(](?P<var>.+)[,]\s(?P<target>.+)[)]").unwrap();
-    static ref PATH_APPEND: Regex = Regex::new(r"^pathAppend[(](?P<var>.+)[,]\s(?P<target>.+)[)]").unwrap();
+    static ref ENV_PREPEND: Regex = Regex::new(r"^(envPrepend|pathPrepend)[(](?P<var>.+)[,]\s(?P<target>.+)[)]").unwrap();
+    static ref ENV_APPEND: Regex = Regex::new(r"^(envAppend|pathAppend)[(](?P<var>.+)[,]\s(?P<target>.+)[)]").unwrap();
 }
 
 pub enum VersionType {
@@ -68,9 +66,8 @@ impl Table {
                                     &*INEXACT_REQUIRED,
                                     &*INEXACT_OPTIONAL);
         let mut env_var = FnvHashMap::default();
-        let env_re_vec : Vec<& Regex> = vec![&*ENV_PREPEND, &*ENV_APPEND, &*PATH_PREPEND, &*PATH_APPEND];
-        for (re, action) in env_re_vec.iter().zip([EnvActionType::Prepend, EnvActionType::Append,
-                                                   EnvActionType::Prepend, EnvActionType::Append].iter()){
+        let env_re_vec : Vec<& Regex> = vec![&*ENV_PREPEND, &*ENV_APPEND];
+        for (re, action) in env_re_vec.iter().zip([EnvActionType::Prepend, EnvActionType::Append].iter()){
             for cap in re.captures_iter(contents.as_str()){
                 let var = String::from(&cap["var"]);
                 let target = String::from(&cap["target"]);
