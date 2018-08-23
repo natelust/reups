@@ -6,17 +6,17 @@ use std::fs::File;
 use std::io::prelude::*;
 
 lazy_static! {
-    static ref EXACT_REGEX: Regex = Regex::new(r"(?ms)if\s[(]type\s==\sexact[)]\s[{](.+)[}]").unwrap();
-    static ref INEXACT_REGEX: Regex = Regex::new(r"(?ms)else\s+[{](.+)[}]").unwrap();
-    static ref EXACT_OPTIONAL: Regex = Regex::new(r"setupOptional[(](.+)\s+[-]j\s(.+)[)]").unwrap();
-    static ref EXACT_REQUIRED: Regex = Regex::new(r"setupRequired[(](.+)\s+[-]j\s(.+)[)]").unwrap();
-    static ref INEXACT_OPTIONAL: Regex = Regex::new(r"setupOptional[(](.+)\s(.+)\s\[").unwrap();
-    static ref INEXACT_REQUIRED: Regex = Regex::new(r"setupRequired[(](.+)\s(.+)\s\[").unwrap();
-    static ref ENV_PREPEND: Regex = Regex::new(r"^envPrepend[(](.+)[,]\s(.+)[)]").unwrap();
-    static ref ENV_APPEND: Regex = Regex::new(r"^envAppend[(](.+)[,]\s(.+)[)]").unwrap();
-    static ref PATH_PREPEND: Regex = Regex::new(r"^pathPrepend[(](.+)[,]\s(.+)[)]").unwrap();
-    static ref PATH_APPEND: Regex = Regex::new(r"^pathAppend[(](.+)[,]\s(.+)[)]").unwrap();
+    static ref EXACT_REGEX: Regex = Regex::new(r"(?ms)if\s[(]type\s==\sexact[)]\s[{](.+?)[}]").unwrap();
+    static ref INEXACT_REGEX: Regex = Regex::new(r"(?ms)else\s+[{](.+?)[}]").unwrap();
 
+    static ref EXACT_OPTIONAL: Regex = Regex::new(r"setupOptional[(](?P<product>.+?)\s+[-]j\s(?P<version>.+?)[)]").unwrap();
+    static ref EXACT_REQUIRED: Regex = Regex::new(r"setupRequired[(](?P<product>.+?)\s+[-]j\s(?P<version>.+?)[)]").unwrap();
+    static ref INEXACT_OPTIONAL: Regex = Regex::new(r"setupOptional[(](?P<product>.+?)\s(?P<version>.+?)\s\[").unwrap();
+    static ref INEXACT_REQUIRED: Regex = Regex::new(r"setupRequired[(](?P<product>.+?)\s(?P<version>.+?)\s\[").unwrap();
+    static ref ENV_PREPEND: Regex = Regex::new(r"^envPrepend[(](?P<var>.+)[,]\s(?P<target>.+)[)]").unwrap();
+    static ref ENV_APPEND: Regex = Regex::new(r"^envAppend[(](?P<var>.+)[,]\s(?P<target>.+)[)]").unwrap();
+    static ref PATH_PREPEND: Regex = Regex::new(r"^pathPrepend[(](?P<var>.+)[,]\s(?P<target>.+)[)]").unwrap();
+    static ref PATH_APPEND: Regex = Regex::new(r"^pathAppend[(](?P<var>.+)[,]\s(?P<target>.+)[)]").unwrap();
 }
 
 pub enum VersionType {
@@ -24,7 +24,7 @@ pub enum VersionType {
     Inexact
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum EnvActionType {
     Prepend,
     Append
@@ -68,6 +68,17 @@ impl Table {
                                     &*INEXACT_REQUIRED,
                                     &*INEXACT_OPTIONAL);
         let mut env_var = FnvHashMap::default();
+        let env_re_vec : Vec<& Regex> = vec![&*ENV_PREPEND, &*ENV_APPEND, &*PATH_PREPEND, &*PATH_APPEND];
+        for (re, action) in env_re_vec.iter().zip([EnvActionType::Prepend, EnvActionType::Append,
+                                                   EnvActionType::Prepend, EnvActionType::Append].iter()){
+            for cap in re.captures_iter(contents.as_str()){
+                let var = String::from(&cap["var"]);
+                let target = String::from(&cap["target"]);
+                let final_target = target.replace("${PRODUCT_DIR}", prod_dir.to_str().unwrap());
+                env_var.insert(var, (action.clone(), final_target));
+            }
+        }
+        /*
         for line in contents.as_str().lines() {
             let mut tmp_match = ENV_PREPEND.captures(line);
             let mut action_type = EnvActionType::Prepend;
@@ -91,7 +102,8 @@ impl Table {
                 env_var.insert(var, (action_type, final_target));
             }
         }
-        Ok(Table {name: name, path: path, product_dir: prod_dir,  exact: exact, inexact: inexact, env_var: env_var})
+        */
+        Ok(Table {name: name, path: path, product_dir: prod_dir, exact: exact, inexact: inexact, env_var: env_var})
     }
 
     fn extract_setup(input: &str, outer_regex: & Regex,
@@ -100,9 +112,19 @@ impl Table {
         let exact_re = outer_regex.captures(input);
         match exact_re {
             Some(caps) => {
-                let temp_string = caps.get(1).unwrap().as_str();
+                let temp_string  = caps.get(1).unwrap().as_str();
                 let mut required_map = FnvHashMap::default();
                 let mut optional_map = FnvHashMap::default();
+                let re_vec = [required_regex, optional_regex];
+                for (re, map) in re_vec.iter().zip(
+                                 [& mut required_map, & mut optional_map].iter_mut()) {
+                    for dep_cap in re.captures_iter(temp_string) {
+                        let prod = &dep_cap["product"];
+                        let vers = &dep_cap["version"];
+                        map.insert(String::from(prod), String::from(vers));
+                    }
+                }
+                /*
                 for line in temp_string.lines() {
                     // Check if the line is an option or required
                     let required_re = required_regex.captures(line);
@@ -120,6 +142,7 @@ impl Table {
 
                     }
                 }
+                */
                 Some(Deps { required: required_map, optional: optional_map })
             },
             None => None
