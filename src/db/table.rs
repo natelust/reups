@@ -6,9 +6,6 @@ use std::fs::File;
 use std::io::prelude::*;
 
 lazy_static! {
-    static ref EXACT_REGEX: Regex = Regex::new(r"(?ms)if\s[(]type\s==\sexact[)]\s[{](.+?)[}]").unwrap();
-    static ref INEXACT_REGEX: Regex = Regex::new(r"(?ms)else\s+[{](.+?)[}]").unwrap();
-
     static ref EXACT_OPTIONAL: Regex = Regex::new(r"setupOptional[(](?P<product>.+?)\s+[-]j\s(?P<version>.+?)[)]").unwrap();
     static ref EXACT_REQUIRED: Regex = Regex::new(r"setupRequired[(](?P<product>.+?)\s+[-]j\s(?P<version>.+?)[)]").unwrap();
     static ref INEXACT_OPTIONAL: Regex = Regex::new(r"setupOptional[(](?P<product>.+?)\s(?P<version>.+?)\s\[").unwrap();
@@ -57,12 +54,10 @@ impl Table {
         // defined as statics because they will remain between different tables
         // being created
         let exact = Table::extract_setup(contents.as_str(),
-                                  &*EXACT_REGEX,
                                   &*EXACT_REQUIRED,
                                   &*EXACT_OPTIONAL);
         // Get the inexact mapping
         let inexact = Table::extract_setup(contents.as_str(),
-                                    &*INEXACT_REGEX,
                                     &*INEXACT_REQUIRED,
                                     &*INEXACT_OPTIONAL);
         let mut env_var = FnvHashMap::default();
@@ -78,27 +73,20 @@ impl Table {
         Ok(Table {name: name, path: path, product_dir: prod_dir, exact: exact, inexact: inexact, env_var: env_var})
     }
 
-    fn extract_setup(input: &str, outer_regex: & Regex,
-                     required_regex: & Regex,
+    fn extract_setup(input: &str, required_regex: & Regex,
                      optional_regex: & Regex) -> Option<Deps> {
-        let exact_re = outer_regex.captures(input);
-        match exact_re {
-            Some(caps) => {
-                let temp_string  = caps.get(1).unwrap().as_str();
-                let mut required_map = FnvHashMap::default();
-                let mut optional_map = FnvHashMap::default();
-                let re_vec = [required_regex, optional_regex];
-                for (re, map) in re_vec.iter().zip(
-                                 [& mut required_map, & mut optional_map].iter_mut()) {
-                    for dep_cap in re.captures_iter(temp_string) {
-                        let prod = &dep_cap["product"];
-                        let vers = &dep_cap["version"];
-                        map.insert(String::from(prod), String::from(vers));
-                    }
-                }
-                Some(Deps { required: required_map, optional: optional_map })
-            },
-            None => None
+        let temp_string = input;
+        let mut required_map = FnvHashMap::default();
+        let mut optional_map = FnvHashMap::default();
+        let re_vec = [required_regex, optional_regex];
+        for (re, map) in re_vec.iter().zip(
+                         [& mut required_map, & mut optional_map].iter_mut()) {
+            for dep_cap in re.captures_iter(temp_string) {
+                let prod = &dep_cap["product"];
+                let vers = &dep_cap["version"];
+                map.insert(String::from(prod), String::from(vers));
+            }
         }
+        Some(Deps { required: required_map, optional: optional_map })
     }
 }
