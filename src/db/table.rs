@@ -78,31 +78,6 @@ impl Table {
                 env_var.insert(var, (action.clone(), final_target));
             }
         }
-        /*
-        for line in contents.as_str().lines() {
-            let mut tmp_match = ENV_PREPEND.captures(line);
-            let mut action_type = EnvActionType::Prepend;
-            if let None = tmp_match {
-                tmp_match = ENV_APPEND.captures(line);
-                action_type = EnvActionType::Append
-            }
-            if let None = tmp_match {
-                tmp_match = PATH_PREPEND.captures(line);
-                action_type = EnvActionType::Prepend;
-            }
-            if let None = tmp_match {
-                tmp_match = PATH_APPEND.captures(line);
-                action_type = EnvActionType::Append;
-            }
-            if let Some(cap) = tmp_match {
-                let var = String::from(cap.get(1).unwrap().as_str());
-                let target= String::from(cap.get(2).unwrap().as_str());
-                let final_target = target.replace("${PRODUCT_DIR}",
-                                                  prod_dir.to_str().unwrap()); 
-                env_var.insert(var, (action_type, final_target));
-            }
-        }
-        */
         Ok(Table {name: name, path: path, product_dir: prod_dir, exact: exact, inexact: inexact, env_var: env_var})
     }
 
@@ -124,25 +99,6 @@ impl Table {
                         map.insert(String::from(prod), String::from(vers));
                     }
                 }
-                /*
-                for line in temp_string.lines() {
-                    // Check if the line is an option or required
-                    let required_re = required_regex.captures(line);
-                    let optional_re = optional_regex.captures(line);
-                    // Add to corresponding vector if the capture is not none
-                    if let Some(req_cap) = required_re {
-                        let prod = req_cap.get(1).unwrap().as_str().trim();
-                        let vers = req_cap.get(2).unwrap().as_str().trim();
-                        required_map.insert(String::from(prod), String::from(vers));
-                    }
-                    if let Some(opt_cap) = optional_re {
-                        let prod = opt_cap.get(1).unwrap().as_str().trim();
-                        let vers = opt_cap.get(2).unwrap().as_str().trim();
-                        optional_map.insert(String::from(prod), String::from(vers));
-
-                    }
-                }
-                */
                 Some(Deps { required: required_map, optional: optional_map })
             },
             None => None
