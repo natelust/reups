@@ -3,6 +3,9 @@ use regex::Regex;
 use std::path;
 use std::io;
 use std::fs::File;
+use std::sync::mpsc::{channel, Sender, Receiver};
+use std::sync::Mutex;
+use std::thread;
 use std::io::prelude::*;
 
 lazy_static! {
@@ -18,6 +21,9 @@ lazy_static! {
     static ref PATH_PREPEND: Regex = Regex::new(r"^pathPrepend[(](?P<var>.+)[,]\s(?P<target>.+)[)]").unwrap();
     static ref PATH_APPEND: Regex = Regex::new(r"^pathAppend[(](?P<var>.+)[,]\s(?P<target>.+)[)]").unwrap();
 }
+
+static mut CHANNELS : Option<Mutex<(Vec<Sender<(String, & Regex, & EnvActionType, String)>>,
+                              Receiver<Option<(String, (EnvActionType, String))>>)>> = None;
 
 pub enum VersionType {
     Exact,
@@ -49,6 +55,18 @@ pub struct Table {
 impl Table {
     pub fn new(name: String, path: path::PathBuf, prod_dir: path::PathBuf)
         -> Result<Table, io::Error>{
+
+        // If the static variable CHANNELS is none, then the worker threads
+        // have not been started, and this is the first table to be created
+        // start some workers that will live the lifetime of the program
+        // execution that will handle some of the regex tasks. This must
+        // be marked unsafe for rust, but has been tested and should be ok
+        unsafe {
+            if CHANNELS.is_none() {
+                spawn_threads();
+            }
+        }
+
         let mut f = File::open(path.clone())?;
         let mut contents = String::new();
         f.read_to_string(&mut contents)?;
@@ -68,14 +86,19 @@ impl Table {
                                     &*INEXACT_REQUIRED,
                                     &*INEXACT_OPTIONAL);
         let mut env_var = FnvHashMap::default();
-        let env_re_vec : Vec<& Regex> = vec![&*ENV_PREPEND, &*ENV_APPEND, &*PATH_PREPEND, &*PATH_APPEND];
-        for (re, action) in env_re_vec.iter().zip([EnvActionType::Prepend, EnvActionType::Append,
-                                                   EnvActionType::Prepend, EnvActionType::Append].iter()){
-            for cap in re.captures_iter(contents.as_str()){
-                let var = String::from(&cap["var"]);
-                let target = String::from(&cap["target"]);
-                let final_target = target.replace("${PRODUCT_DIR}", prod_dir.to_str().unwrap());
-                env_var.insert(var, (action.clone(), final_target));
+        let prod_dir_string = String::from(prod_dir.to_str().unwrap());
+        unsafe {
+            let guard = CHANNELS.as_ref().unwrap().lock().unwrap();
+            let mut sender_iter = guard.0.iter().cycle(); 
+            let env_re_vec : Vec<& Regex> = vec![&*ENV_PREPEND, &*ENV_APPEND, &*PATH_PREPEND, &*PATH_APPEND];
+            for (re, action) in env_re_vec.iter().zip([EnvActionType::Prepend, EnvActionType::Append, EnvActionType::Prepend, EnvActionType::Append].iter()){
+                let sender = sender_iter.next().unwrap();
+                sender.send((contents.clone(), re, action, prod_dir_string.clone())).unwrap();
+            }
+            for _ in 0..env_re_vec.len(){
+                if let Some(result) = guard.1.recv().unwrap() {
+                    env_var.insert(result.0, result.1);
+                }
             }
         }
         Ok(Table {name: name, path: path, product_dir: prod_dir, exact: exact, inexact: inexact, env_var: env_var})
@@ -103,5 +126,32 @@ impl Table {
             },
             None => None
         }
+    }
+}
+
+fn spawn_threads() {
+    let mut sender_vec : Vec<Sender<(String, & Regex, &EnvActionType, String)>> = vec![];
+    let (send_to_main, recv_from_thread) = channel();
+    for _ in 0..4 {
+        let (send_to_thread, recv_from_main) = channel();
+        sender_vec.push(send_to_thread);
+        let send_to_main_clone = send_to_main.clone();
+        thread::spawn(move || {
+            for entry in recv_from_main.iter(){
+                let (text, re, action, prod) = entry;
+                if !re.is_match(text.as_str()) {
+                    let _ = send_to_main_clone.send(None);
+                }
+                for cap in re.captures_iter(text.as_str()){
+                    let var = String::from(&cap["var"]);
+                    let target = String::from(&cap["target"]);
+                    let final_target = target.replace("${PRODUCT_DIR}", prod.as_str());
+                    let _ = send_to_main_clone.send(Some((var, (action.clone(), final_target))));
+                }
+            }
+        });
+    }
+    unsafe {
+        CHANNELS = Some(Mutex::new((sender_vec, recv_from_thread)));
     }
 }
