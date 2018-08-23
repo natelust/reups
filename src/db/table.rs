@@ -6,10 +6,13 @@ use std::fs::File;
 use std::io::prelude::*;
 
 lazy_static! {
-    static ref EXACT_OPTIONAL: Regex = Regex::new(r"setupOptional[(](?P<product>.+?)\s+[-]j\s(?P<version>.+?)[)]").unwrap();
-    static ref EXACT_REQUIRED: Regex = Regex::new(r"setupRequired[(](?P<product>.+?)\s+[-]j\s(?P<version>.+?)[)]").unwrap();
-    static ref INEXACT_OPTIONAL: Regex = Regex::new(r"setupOptional[(](?P<product>.+?)\s(?P<version>.+?)\s\[").unwrap();
-    static ref INEXACT_REQUIRED: Regex = Regex::new(r"setupRequired[(](?P<product>.+?)\s(?P<version>.+?)\s\[").unwrap();
+    static ref EXACT: Regex = Regex::new(r"(?P<type>setup(Optional|Required))[(](?P<product>.+?)\s+[-]j\s(?P<version>.+?)[)]").unwrap();
+    // I think we want the whole last part of this to be an optional non capture group, and if
+    // there is no latter match, set it to "" for the version. This way we can deal with files that
+    // have no versions at all
+    static ref INEXACT: Regex = Regex::new(r"(?P<type>setup(Optional|Requred))[(](?P<product>.+?)\s(?P<version>.+?)\s\[").unwrap();
+
+
     static ref ENV_PREPEND: Regex = Regex::new(r"^(envPrepend|pathPrepend)[(](?P<var>.+)[,]\s(?P<target>.+)[)]").unwrap();
     static ref ENV_APPEND: Regex = Regex::new(r"^(envAppend|pathAppend)[(](?P<var>.+)[,]\s(?P<target>.+)[)]").unwrap();
 }
@@ -54,12 +57,10 @@ impl Table {
         // defined as statics because they will remain between different tables
         // being created
         let exact = Table::extract_setup(contents.as_str(),
-                                  &*EXACT_REQUIRED,
-                                  &*EXACT_OPTIONAL);
+                                  &*EXACT);
         // Get the inexact mapping
         let inexact = Table::extract_setup(contents.as_str(),
-                                    &*INEXACT_REQUIRED,
-                                    &*INEXACT_OPTIONAL);
+                                    &*INEXACT);
         let mut env_var = FnvHashMap::default();
         let env_re_vec : Vec<& Regex> = vec![&*ENV_PREPEND, &*ENV_APPEND];
         for (re, action) in env_re_vec.iter().zip([EnvActionType::Prepend, EnvActionType::Append].iter()){
@@ -73,20 +74,25 @@ impl Table {
         Ok(Table {name: name, path: path, product_dir: prod_dir, exact: exact, inexact: inexact, env_var: env_var})
     }
 
-    fn extract_setup(input: &str, required_regex: & Regex,
-                     optional_regex: & Regex) -> Option<Deps> {
+    fn extract_setup(input: &str, re: & Regex) -> Option<Deps> {
         let temp_string = input;
         let mut required_map = FnvHashMap::default();
         let mut optional_map = FnvHashMap::default();
-        let re_vec = [required_regex, optional_regex];
-        for (re, map) in re_vec.iter().zip(
-                         [& mut required_map, & mut optional_map].iter_mut()) {
+        //let re_vec = [required_regex, optional_regex];
+        //for (re, map) in re_vec.iter().zip(
+        //                 [& mut required_map, & mut optional_map].iter_mut()) {
             for dep_cap in re.captures_iter(temp_string) {
+                let option_type = &dep_cap["type"];
                 let prod = &dep_cap["product"];
                 let vers = &dep_cap["version"];
-                map.insert(String::from(prod), String::from(vers));
+                if option_type == "setupRequired" {
+                    required_map.insert(String::from(prod), String::from(vers));
+                }
+                if option_type == "setupOptional" {
+                    optional_map.insert(String::from(prod), String::from(vers));
+                }
             }
-        }
+        //}
         Some(Deps { required: required_map, optional: optional_map })
     }
 }
