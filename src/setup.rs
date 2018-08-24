@@ -3,6 +3,7 @@ extern crate fnv;
 use self::fnv::FnvHashMap;
 
 use std::env;
+use std::process;
 use std::io;
 use std::io::prelude::*;
 
@@ -72,6 +73,10 @@ pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::A
         mode = table::VersionType::Inexact;
     }
     if let Some(name) = product {
+        if !db.has_product(&name.to_string()) {
+            eprintln!("Cannot find product `{}` to setup", name);
+            process::exit(1);
+        }
         let table = db.get_table_from_tag(&name.to_string(), tags.clone());
         // If someone specified the just flag, don't look up any dependencies
         let mut deps :Option<db::graph::Graph> = None;

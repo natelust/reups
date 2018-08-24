@@ -220,6 +220,18 @@ impl DB {
         }
     }
 
+    pub fn has_product(& self, product: & String) -> bool {
+        // iterate over the global and user db
+        for db in self.iter() {
+            if !db.product_to_version_info.contains_key(product){
+                return false;
+            }
+            else if !db.product_to_tags.contains_key(product){
+                return false;
+            }
+        }
+        return true;
+    }
 }
 
 
