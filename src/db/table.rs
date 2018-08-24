@@ -6,15 +6,15 @@ use std::fs::File;
 use std::io::prelude::*;
 
 lazy_static! {
-    static ref EXACT: Regex = Regex::new(r"(?P<type>setup(Optional|Required))[(](?P<product>.+?)\s+[-]j\s(?P<version>.+?)[)]").unwrap();
+    static ref EXACT: Regex = Regex::new(r"\b(?P<type>setup(Optional|Required))[(](?P<product>[[:word:]]+?\b)\s+[-]j\s(?P<version>\S+?\b)[)]").unwrap();
     // I think we want the whole last part of this to be an optional non capture group, and if
     // there is no latter match, set it to "" for the version. This way we can deal with files that
     // have no versions at all
-    static ref INEXACT: Regex = Regex::new(r"(?P<type>setup(Optional|Requred))[(](?P<product>.+?)\s(?P<version>.+?)\s\[").unwrap();
+    static ref INEXACT: Regex = Regex::new(r"\b(?P<type>setup(Optional|Requred))[(](?P<product>[[:word:]]+?\b)(?:\s(?P<version>\S+?\b)\s\[)?").unwrap();
 
 
-    static ref ENV_PREPEND: Regex = Regex::new(r"^(envPrepend|pathPrepend)[(](?P<var>.+)[,]\s(?P<target>.+)[)]").unwrap();
-    static ref ENV_APPEND: Regex = Regex::new(r"^(envAppend|pathAppend)[(](?P<var>.+)[,]\s(?P<target>.+)[)]").unwrap();
+    static ref ENV_PREPEND: Regex = Regex::new(r"^(envPrepend|pathPrepend)[(](?P<var>\S+)[,]\s(?P<target>\w+?)[)]").unwrap();
+    static ref ENV_APPEND: Regex = Regex::new(r"^(envAppend|pathAppend)[(](?P<var>\S+)[,]\s(?P<target>\w+?)[)]").unwrap();
 }
 
 pub enum VersionType {
@@ -78,21 +78,20 @@ impl Table {
         let temp_string = input;
         let mut required_map = FnvHashMap::default();
         let mut optional_map = FnvHashMap::default();
-        //let re_vec = [required_regex, optional_regex];
-        //for (re, map) in re_vec.iter().zip(
-        //                 [& mut required_map, & mut optional_map].iter_mut()) {
-            for dep_cap in re.captures_iter(temp_string) {
-                let option_type = &dep_cap["type"];
-                let prod = &dep_cap["product"];
-                let vers = &dep_cap["version"];
-                if option_type == "setupRequired" {
-                    required_map.insert(String::from(prod), String::from(vers));
-                }
-                if option_type == "setupOptional" {
-                    optional_map.insert(String::from(prod), String::from(vers));
-                }
+        for dep_cap in re.captures_iter(temp_string) {
+            let option_type = &dep_cap["type"];
+            let prod = &dep_cap["product"];
+            let vers = match dep_cap.name("version") {
+                Some(ver) => ver.as_str(),
+                None => ""
+            };
+            if option_type == "setupRequired" {
+                required_map.insert(String::from(prod), String::from(vers));
             }
-        //}
+            if option_type == "setupOptional" {
+                optional_map.insert(String::from(prod), String::from(vers));
+            }
+        }
         Some(Deps { required: required_map, optional: optional_map })
     }
 }
