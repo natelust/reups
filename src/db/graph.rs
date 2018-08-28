@@ -93,18 +93,20 @@ impl<'a> Graph<'a> {
                               version_type: table::VersionType,
                               node_type: NodeType,
                               recurse: bool) {
-        let result = self._db.get_table_from_tag(& product, tag.clone());
-        if let Some(table) = result {
-            self.add_table(&table, version_type, node_type, Some(tag), recurse);
+        if !self._processed.contains(&product){
+            let result = self._db.get_table_from_tag(& product, tag.clone());
+            if let Some(table) = result {
+                self.add_table(&table, version_type, node_type, Some(tag), recurse);
+            }
         }
     }
     
     pub fn add_product_by_version(& mut self, product: String, version: String,
                                   version_type: table::VersionType, node_type: NodeType, recurse: bool){
-        let result = self._db.get_table_from_version(& product, & version);
-        if let Some(table) = result {
-            if !self._processed.contains(&table.name) {
-                self.add_table(&table, version_type, node_type, None, recurse);
+        if !self._processed.contains(&product){
+            let result = self._db.get_table_from_version(& product, & version);
+                if let Some(table) = result {
+                    self.add_table(&table, version_type, node_type, None, recurse);
             }
         }
     }
