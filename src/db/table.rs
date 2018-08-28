@@ -13,10 +13,11 @@ lazy_static! {
     static ref INEXACT: Regex = Regex::new(r"\b(?P<type>setup(Optional|Requred))[(](?P<product>[[:word:]]+?\b)(?:\s(?P<version>\S+?\b)\s\[)?").unwrap();
 
 
-    static ref ENV_PREPEND: Regex = Regex::new(r"^(envPrepend|pathPrepend)[(](?P<var>\S+)[,]\s(?P<target>\w+?)[)]").unwrap();
-    static ref ENV_APPEND: Regex = Regex::new(r"^(envAppend|pathAppend)[(](?P<var>\S+)[,]\s(?P<target>\w+?)[)]").unwrap();
+    static ref ENV_PREPEND: Regex = Regex::new(r"(envPrepend|pathPrepend)[(](?P<var>.+?)[,]\s(?P<target>.+?)[)]").unwrap();
+    static ref ENV_APPEND: Regex = Regex::new(r"(envAppend|pathAppend)[(](?P<var>.+?)[,]\s(?P<target>.+?)[)]").unwrap();
 }
 
+#[derive(Clone)]
 pub enum VersionType {
     Exact,
     Inexact
@@ -28,13 +29,13 @@ pub enum EnvActionType {
     Append
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Deps {
     pub required: FnvHashMap<String, String>,
     pub optional: FnvHashMap<String, String>
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Table {
     pub name: String,
     pub path: path::PathBuf,
