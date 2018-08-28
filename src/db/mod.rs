@@ -13,6 +13,7 @@ use std::fs;
 use std::path;
 use std::process;
 use std::thread;
+use std::cell::RefCell;
 
 //use std::collections::HashMap;
 
@@ -73,7 +74,8 @@ impl<'a> Iterator for DBIter<'a> {
 pub struct DB {
     system_db: DBImpl,
     user_db: Option<DBImpl>,
-    stack_root: path::PathBuf
+    stack_root: path::PathBuf,
+    cache: RefCell<FnvHashMap<(String, String), table::Table>>
 }
 
 impl fmt::Debug for DB {
@@ -133,12 +135,14 @@ impl DB {
                 }).to_path_buf()
             }
         };
+        let cache = RefCell::new(FnvHashMap::default());
 
         // Consruct and return the database struct
         DB {
             system_db,
             user_db,
-            stack_root
+            stack_root,
+            cache
         }
 
     }
@@ -152,6 +156,16 @@ impl DB {
     }
 
     pub fn get_table_from_version(& self, product: & String, version: & String) -> Option<table::Table> {
+        // try getting from the db cache
+        // block this so that the reference to cache goes out of scope once we are done
+        {
+            let cache_borrow = self.cache.borrow();
+            let table_option = cache_borrow.get(&(product.clone(), version.clone()));
+            if let Some(table_from_cache) = table_option {
+                return Some(table_from_cache.clone())
+            }
+        }
+
         let mut tables_vec: Vec<Option<(path::PathBuf, path::PathBuf)>> = vec![];
 
         for db in self.iter() {
@@ -174,7 +188,10 @@ impl DB {
         match tables_vec.len() {
             x if x > 0 => {
                 let (prod_dir, total) = tables_vec.remove(x-1).unwrap();
-                table::Table::new(product.clone(), total, prod_dir).ok()},
+                let resolved_table = table::Table::new(product.clone(), total, prod_dir).ok();
+                self.cache.borrow_mut().insert((product.clone(), version.clone()), resolved_table.as_ref().unwrap().clone());
+                resolved_table
+            },
             _ => None
         }
     }
