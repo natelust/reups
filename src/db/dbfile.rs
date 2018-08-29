@@ -13,6 +13,7 @@ lazy_static! {
     static ref KEY_REGEX: Regex = Regex::new(r"(.*) = (.*)").unwrap();
 }
 
+#[derive(Debug)]
 pub struct DBFile {
     path: path::PathBuf,
     contents: RefCell<FnvHashMap<String, String>>

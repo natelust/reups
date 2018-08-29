@@ -14,6 +14,7 @@ use std::path;
 use std::process;
 use std::thread;
 use std::cell::RefCell;
+use std::path::PathBuf;
 
 //use std::collections::HashMap;
 
@@ -111,10 +112,29 @@ impl DB {
                              product_to_tags: product_to_tags
         };
 
-        // Check if a user directory was supplied, if so implement a db, else record None
-        let user_db = match user_tag_root {
+        // Check if a user directory was supplied, if so implement a db, if not try to get a defaul, else record None
+        let user_db_path = match user_tag_root{
+            Some(user_path) => Some(PathBuf::from(user_path)),
+            None => {
+                let user_home= env::home_dir();
+                if let Some(mut user_path) = user_home {
+                    user_path.push(".eups/ups_db");
+                    if user_path.is_dir(){
+                        Some(user_path)
+                    }
+                    else {
+                        None
+                    }
+                }
+                else {
+                    None
+                }
+            }
+        };
+
+        let user_db = match user_db_path {
             Some(user_path) => {
-                let (directory, product_to_info, tags_to_info, product_to_tags) = build_db(user_path.to_string());
+                let (directory, product_to_info, tags_to_info, product_to_tags) = build_db(String::from(user_path.to_str().unwrap()));
                 Some(DBImpl { directory: directory,
                               tag_to_product_info: tags_to_info,
                               product_to_version_info: product_to_info,
@@ -169,20 +189,22 @@ impl DB {
         let mut tables_vec: Vec<Option<(path::PathBuf, path::PathBuf)>> = vec![];
 
         for db in self.iter() {
-            let prod_dir = db.product_to_version_info[product][version].entry(& "PROD_DIR".to_string());
-            let ups_dir = db.product_to_version_info[product][version].entry(& "UPS_DIR".to_string());
-            if prod_dir.is_none() || ups_dir.is_none() {
-                tables_vec.push(None);
-                continue;
+            if db.product_to_version_info.contains_key(product) && db.product_to_version_info[product].contains_key(version) {
+                let prod_dir = db.product_to_version_info[product][version].entry(& "PROD_DIR".to_string());
+                let ups_dir = db.product_to_version_info[product][version].entry(& "UPS_DIR".to_string());
+                if prod_dir.is_none() || ups_dir.is_none() {
+                    tables_vec.push(None);
+                    continue;
+                }
+                let mut total = self.stack_root.clone();
+                let mut product_clone = product.clone();
+                product_clone.push_str(".table");
+                total.push(prod_dir.unwrap());
+                let total_only_prod = total.clone();
+                total.push(ups_dir.unwrap());
+                total.push(product_clone);
+                tables_vec.push(Some((total_only_prod, total)));
             }
-            let mut total = self.stack_root.clone();
-            let mut product_clone = product.clone();
-            product_clone.push_str(".table");
-            total.push(prod_dir.unwrap());
-            let total_only_prod = total.clone();
-            total.push(ups_dir.unwrap());
-            total.push(product_clone);
-            tables_vec.push(Some((total_only_prod, total)));
         }
 
         match tables_vec.len() {
@@ -203,10 +225,12 @@ impl DB {
         for db in self.iter() {
             let mut version: Option<String> = None;
             for t in &tag {
-                let ref tag_map = db.tag_to_product_info[t.clone()];
-                if let Some(product_file) = tag_map.get(product) {
-                    version = product_file.entry(& "VERSION".to_string());
-                    break;
+                if db.tag_to_product_info.contains_key(t.clone()){
+                    let ref tag_map = db.tag_to_product_info[t.clone()];
+                    if let Some(product_file) = tag_map.get(product) {
+                        version = product_file.entry(& "VERSION".to_string());
+                        break;
+                    }
                 }
             }
             versions_vec.push(version);
@@ -215,14 +239,27 @@ impl DB {
     }
 
     pub fn get_table_from_tag(& self, product: & String, tag: Vec<& String>) -> Option<table::Table>{
-        let mut versions_vec = self.get_versions_from_tag(product, tag);
+        let versions_vec = self.get_versions_from_tag(product, tag);
         // use the last element, as this will select the user tag if one is present else
         // it will return the result from the main tag
         // it is safe to unwrap here, as there must be at least one db to construct the
         // object. The real Option to worry about is the one that is contained in the vec
 
         match versions_vec.len() {
-            x if x >0 => self.get_table_from_version(product, & versions_vec.remove(x-1)?),
+            x if x >0 => {
+                let mut res :Option<table::Table> = None;
+                for ver in versions_vec.iter().rev(){
+                    if ver.is_some(){
+                        res = self.get_table_from_version(product, (*ver).as_ref().unwrap());
+                        // if we found the product in a given database, then bail out, no need
+                        // to search further
+                        if res.is_some() {
+                            break;
+                        }
+                    }
+                }
+                res
+            },
             _ => None
         }
     }
@@ -240,14 +277,14 @@ impl DB {
     pub fn has_product(& self, product: & String) -> bool {
         // iterate over the global and user db
         for db in self.iter() {
-            if !db.product_to_version_info.contains_key(product){
-                return false;
+            if db.product_to_version_info.contains_key(product){
+                return true;
             }
-            else if !db.product_to_tags.contains_key(product){
-                return false;
+            else if db.product_to_tags.contains_key(product){
+                return true;
             }
         }
-        return true;
+        return false;
     }
 }
 
