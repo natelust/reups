@@ -1,4 +1,6 @@
 extern crate regex;
+#[macro_use]
+extern crate clap;
 mod argparse;
 mod db;
 mod setup;
