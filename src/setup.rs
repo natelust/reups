@@ -122,8 +122,10 @@ fn get_table_path_from_input(input_path: & str) -> Option<table::Table> {
         }
     }
     if let Some(table_file) = table_path {
+        let table_file = table_file.canonicalize().unwrap();
+        let prod_dir = prod_dir.unwrap().canonicalize().unwrap();
         let name = String::from(table_file.file_stem().unwrap().to_str().unwrap());
-        Some(table::Table::new(name, table_file, prod_dir.unwrap()).unwrap())
+        Some(table::Table::new(name, table_file, prod_dir).unwrap())
     }
     else {
         return None
