@@ -167,6 +167,14 @@ impl DB {
 
     }
 
+    pub fn get_db_directories(& self) -> Vec<PathBuf> {
+        let mut paths = Vec::new();
+        for db in self.iter() {
+            paths.push(db.directory.clone());
+        }
+        paths
+    }
+
     pub fn product_versions(& self, product: & String){
         for db in self.iter() {
             for key in db.product_to_version_info[product].keys() {
@@ -218,22 +226,33 @@ impl DB {
         }
     }
 
-    pub fn get_versions_from_tag(& self, product: & String, tag: Vec<& String>) -> Vec<Option<String>> {
+    pub fn get_flavors_from_version(& self, product : & String, version : & String) -> Vec<String> {
+        let mut flavors = Vec::new();
+        for db in self.iter() {
+            if db.product_to_version_info.contains_key(product) && db.product_to_version_info[product].contains_key(version){
+                let flavor_option = db.product_to_version_info[product][version].entry(&String::from("FLAVOR"));
+                if let Some(flav) = flavor_option {
+                    flavors.push(flav);
+                }
+            }
+        }
+        flavors
+    }
+    pub fn get_versions_from_tag(& self, product: & String, tag: Vec<& String>) -> Vec<String> {
          // store versions found in the main db and the user db
-        let mut versions_vec: Vec<Option<String>> = vec![];
+        let mut versions_vec: Vec<String> = vec![];
         // look up the products
         for db in self.iter() {
-            let mut version: Option<String> = None;
             for t in &tag {
                 if db.tag_to_product_info.contains_key(t.clone()){
                     let ref tag_map = db.tag_to_product_info[t.clone()];
                     if let Some(product_file) = tag_map.get(product) {
-                        version = product_file.entry(& "VERSION".to_string());
+                        let version = product_file.entry(& "VERSION".to_string());
+                        versions_vec.push(version.unwrap());
                         break;
                     }
                 }
             }
-            versions_vec.push(version);
         }
         versions_vec
     }
@@ -249,14 +268,12 @@ impl DB {
             x if x >0 => {
                 let mut res :Option<table::Table> = None;
                 for ver in versions_vec.iter().rev(){
-                    if ver.is_some(){
-                        res = self.get_table_from_version(product, (*ver).as_ref().unwrap());
+                        res = self.get_table_from_version(product, ver);
                         // if we found the product in a given database, then bail out, no need
                         // to search further
                         if res.is_some() {
                             break;
                         }
-                    }
                 }
                 res
             },
