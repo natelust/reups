@@ -10,7 +10,7 @@ lazy_static! {
     // I think we want the whole last part of this to be an optional non capture group, and if
     // there is no latter match, set it to "" for the version. This way we can deal with files that
     // have no versions at all
-    static ref INEXACT: Regex = Regex::new(r"\b(?P<type>setup(Optional|Requred))[(](?P<product>[[:word:]]+?\b)(?:\s(?P<version>\S+?\b)\s\[)?").unwrap();
+    static ref INEXACT: Regex = Regex::new(r"\b(?P<type>setup(Optional|Required))[(](?P<product>[[:word:]]+?\b)(?:\s(?P<version>\S+?\b)\s\[)?").unwrap();
 
 
     static ref ENV_PREPEND: Regex = Regex::new(r"(envPrepend|pathPrepend)[(](?P<var>.+?)[,]\s(?P<target>.+?)[)]").unwrap();
