@@ -75,6 +75,15 @@ impl<'a> Graph<'a> {
         products
     }
 
+    pub fn is_optional(& self, name : &String) -> bool {
+        let node = self._name_map[name];
+        let weight = self._graph.node_weight(node);
+        match weight {
+            Some(NodeType::Optional) => true,
+            _ => false
+        }
+    }
+
     pub fn connect_products(& mut self, source: &String, target: &String, version: String) -> Result<(), &str> {
         if !self.has_product(source) {
             return Err("The specified source is not in the graph");

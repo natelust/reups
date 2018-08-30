@@ -206,8 +206,21 @@ pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::A
                 // easiest, but it could be wrong and this code should be thought through more.
                 // FINDME
                 let largest_version = versions.iter().max().unwrap();
-                let node_table = db.get_table_from_version(&name, &largest_version).unwrap();
-                setup_table(&node_table, & mut env_vars, keep);
+                let mut node_table_option : Option<table::Table>;
+                if largest_version.as_str() != "" {
+                    node_table_option = db.get_table_from_version(&name, &largest_version);
+                }
+                else {
+                    node_table_option = db.get_table_from_tag(&name, tags.clone());
+                }
+                match (node_table_option, dependencies.is_optional(&name)) {
+                    (Some(node_table), _) => setup_table(&node_table, & mut env_vars, keep),
+                    (None, true) => continue,
+                    (None, false) => {
+                        eprintln!("Cannot find any acceptable table for {}", &name);
+                        process::exit(1);
+                    }
+                }
             }
         }
         // Process all the environment variables into a string to return
