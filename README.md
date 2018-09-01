@@ -24,7 +24,7 @@ missing, feel free to implement it and send a pull request!
 
 ### Installing
 
-* From Source
+#### From Source
 This project is built in the rust programming language, and is available as a crate on crates.io. Crate is the
 package management/build tool for the rust programming language and can be used to fetch a copy of this code.
 
@@ -32,18 +32,18 @@ The source repository (and main home) for this project can be found on Github
 [here](https://github.com/natelust/reups). If cloning from the github source, cargo is still required for
 compilation.
 
-* Binaries
+#### Binaries
 Binaries of release versions can be found on Github [here](https://github.com/natelust/reups/releases). These
 are available for both linux (distro agnostic), and MacOs (10.7 and higher).
 
-###Usage
+### Usage
 In it's current state reups bootstraps itself off an eups installation. As such eups must be setup prior to
 using reups. After eups is setup, reups should be set up by evaulating the results of the builtin prep command, as can be seen in the following example.
 
 __Note__ As of version 0.1.0, reups only implements the setup functionality of eups, with a command called `rsetup`,
 chosen to not interfere with the default `setup` command.
 
-####Example
+#### Example
 ```bash
 # Setup the standard eups installation
 source <path_to_eups>/bin/setups.sh
