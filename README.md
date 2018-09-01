@@ -24,7 +24,7 @@ missing, feel free to implement it and send a pull request!
 
 ### Installing
 
-####From Source
+* From Source
 This project is built in the rust programming language, and is available as a crate on crates.io. Crate is the
 package management/build tool for the rust programming language and can be used to fetch a copy of this code.
 
@@ -32,7 +32,7 @@ The source repository (and main home) for this project can be found on Github
 [here](https://github.com/natelust/reups). If cloning from the github source, cargo is still required for
 compilation.
 
-###Binaries
+* Binaries
 Binaries of release versions can be found on Github [here](https://github.com/natelust/reups/releases). These
 are available for both linux (distro agnostic), and MacOs (10.7 and higher).
 
