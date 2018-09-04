@@ -59,10 +59,10 @@ fn setup_table(product_version : &String, product_table: &table::Table, env_vars
         setup_string_vec.push("\\(none\\)".to_string());
     }
     else {
-        setup_string_vec.push(db_path.to_str().unwrap().to_string());
+        setup_string_vec.push(db_path.to_str().unwrap().to_string().replace("ups_db/",""));
     }
     env_vars.insert(prod_dir_label, String::from(product_table.product_dir.to_str().unwrap()));
-    env_vars.insert(setup_var, setup_string_vec.join(" "));
+    env_vars.insert(setup_var, setup_string_vec.join("\\ "));
 
     // iterate over all environment variables, values in the supplied table
     for (k, v) in product_table.env_var.iter(){
