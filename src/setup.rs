@@ -16,6 +16,11 @@ use db;
 use table;
 use argparse;
 
+#[cfg(target_os = "macos")]
+static SYSTEM_OS: &str = "Darwin64";
+#[cfg(target_os = "linux")]
+static SYSTEM_OS: &str = "Linux64";
+
 fn setup_table(product_version : &String, product_table: &table::Table, env_vars :& mut FnvHashMap<String, String>, keep: bool, flavor : &String, db_path: PathBuf) {
     // set the setup env var
     let mut setup_var = String::from("SETUP_");
@@ -36,10 +41,28 @@ fn setup_table(product_version : &String, product_table: &table::Table, env_vars
     }
 
     // add this product in to the environment map that is to be setup
+    let mut setup_string_vec = vec![product_table.name.clone(),
+                                    product_version.clone()];
+
+    // if there is no flavor use the system os as platform
+    setup_string_vec.push("-f".to_string());
+    if flavor.is_empty() {
+        setup_string_vec.push(SYSTEM_OS.to_string());
+    }
+    else{
+        setup_string_vec.push(flavor.clone());
+    }
+
+    // Set db dir to none if there is no db dir (local setup)
+    setup_string_vec.push("-Z".to_string());
+    if db_path.to_str().unwrap().is_empty() {
+        setup_string_vec.push("\\(none\\)".to_string());
+    }
+    else {
+        setup_string_vec.push(db_path.to_str().unwrap().to_string());
+    }
     env_vars.insert(prod_dir_label, String::from(product_table.product_dir.to_str().unwrap()));
-    env_vars.insert(setup_var, [product_table.name.clone(), product_version.clone(),
-                               "-f".to_string(), flavor.clone(), "-Z".to_string(),
-                               db_path.to_str().unwrap().to_string().replace("ups_db/", "")].join("\\ "));
+    env_vars.insert(setup_var, setup_string_vec.join(" "));
 
     // iterate over all environment variables, values in the supplied table
     for (k, v) in product_table.env_var.iter(){
