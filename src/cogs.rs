@@ -4,13 +4,19 @@
  * Copyright Nate Lust 2018*/
 
 use std::env;
-use std::process;
 use std::path::PathBuf;
+
+macro_rules! exit_with_message {
+    ($message:expr) => {
+        use std::process::exit;
+        eprintln!("{}", $message);
+        exit(1);
+    }
+}
 
 pub fn get_eups_path_from_env() -> PathBuf {
     let env_var = env::var("EUPS_PATH").unwrap_or_else(|e|{
-        eprintln!("Problem loading eups path {}", e);
-        process::exit(1);
+        exit_with_message!(format!("Problem loading eups path: {}", e));
     });
     let eups_path_vec : Vec<&str> = env_var.split(":").collect();
     // only return the first member of the vec, which should be the most
@@ -19,8 +25,7 @@ pub fn get_eups_path_from_env() -> PathBuf {
     let mut eups_path = match eups_path_option {
         Some(eups_path) => PathBuf::from(eups_path),
         None => {
-            eprintln!("Problem loading eups path from env var");
-            process::exit(1);
+            exit_with_message!("Problem loading eups path from env var");
         }
     };
     eups_path.push("ups_db");
@@ -28,8 +33,7 @@ pub fn get_eups_path_from_env() -> PathBuf {
         eups_path
     }
     else {
-       eprintln!("Eups path defined in env var does not appear to be a directory");
-       process::exit(1);
+        exit_with_message!("Eups path defined in env var does not appear to be a directory");
     }
 }
 

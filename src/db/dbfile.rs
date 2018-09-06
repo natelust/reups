@@ -6,7 +6,6 @@
 use db::fnv::FnvHashMap;
 use std::io;
 use std::path;
-use std::process;
 
 use std::cell::RefCell;
 use std::fs::File;
@@ -39,9 +38,9 @@ impl DBFile {
         }
         if db_is_empty {
             self.load_file().unwrap_or_else(|_e|{
-                println!("Problem accessing {}, could not create database",
-                         self.path.to_str().unwrap());
-                process::exit(1);
+                exit_with_message!(
+                    format!("Problem accessing {}, could not create database",
+                            self.path.to_str().unwrap()));
             });
         }
         match self.contents.borrow().get(key) {

@@ -10,7 +10,6 @@ use self::fnv::FnvHashMap;
 use std::env;
 use std::path::PathBuf;
 use std::fs;
-use std::process;
 
 use db;
 use table;
@@ -220,8 +219,7 @@ pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::A
     let table_option = match (product, sub_args.value_of("relative")) {
         (Some(name), _) => {
             if !db.has_product(&name.to_string()) {
-                eprintln!("Cannot find product `{}` to setup", name);
-                process::exit(1);
+                exit_with_message!(format!("Cannot find product `{}` to setup", name));
             }
             let local_table = db.get_table_from_tag(&name.to_string(), tags.clone());
             let versions = db.get_versions_from_tag(&name.to_string(), tags.clone());
@@ -324,8 +322,7 @@ pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::A
                     },
                     (None, true) => continue,
                     (None, false) => {
-                        eprintln!("Cannot find any acceptable table for {}", &name);
-                        process::exit(1);
+                        exit_with_message!(format!("Cannot find any acceptable table for {}", &name));
                     }
                 }
             }
@@ -339,8 +336,7 @@ pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::A
         println!("{}", return_string);
     }
     else {
-        eprintln!("Error, no product to setup, please specify product or path to table with -r");
-        process::exit(1);
+        exit_with_message!("Error, no product to setup, please specify product or path to table with -r");
     }
 }
 

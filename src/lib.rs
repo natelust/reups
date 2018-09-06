@@ -6,10 +6,11 @@
 extern crate regex;
 #[macro_use]
 extern crate clap;
+#[macro_use]
+mod cogs;
 mod argparse;
 mod db;
 mod setup;
-mod cogs;
 pub use argparse::*;
 pub use db::*;
 pub use setup::*;

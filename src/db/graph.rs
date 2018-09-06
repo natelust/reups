@@ -151,7 +151,7 @@ impl<'a> Graph<'a> {
             for (k, v) in dep_vec.iter() {
                 self.add_or_update_product(k.clone(), node_type.clone());
                 if let Err(_) = self.connect_products(top, &k, v.clone()) {
-                    println!("There was an issue connecting products in the graph");
+                    eprintln!("There was an issue connecting products in the graph, topological walks my be incorrect");
                 }
                 
                 match (&version_type, tag, recurse) {
