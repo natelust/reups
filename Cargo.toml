@@ -5,7 +5,7 @@ authors = ["Nate Lust <nlust@astro.princeton.edu>"]
 description = "A clean implementation of the eups package management system in rust"
 repository = "https://github.com/natelust/reups"
 readme = "README.md"
-license = "MPLv2"
+license = "Mozilla Public License 2.0"
 license-file = "LICENSE"
 categories = ["development-tools"]
 
