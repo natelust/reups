@@ -15,7 +15,7 @@ use std::io::prelude::*;
 use regex::Regex;
 
 lazy_static! {
-    static ref KEY_REGEX: Regex = Regex::new(r"(.*) = (.*)").unwrap();
+    static ref KEY_REGEX: Regex = Regex::new(r"(?P<key>.*) = (?P<value>.*)").unwrap();
 }
 
 #[derive(Debug)]
@@ -60,8 +60,9 @@ impl DBFile {
             let cap = KEY_REGEX.captures(line);
             match cap {
                 Some(c) => {
-                    self.contents.borrow_mut().insert(String::from(c.get(1).unwrap().as_str().trim()),
-                                                      String::from(c.get(2).unwrap().as_str().trim()));
+                    let key = String::from(c["key"].trim());
+                    let value = String::from(c["value"].trim());
+                    self.contents.borrow_mut().insert(key, value);
                 },
                 None => {
                     continue;
