@@ -9,6 +9,7 @@ extern crate clap;
 mod argparse;
 mod db;
 mod setup;
+mod cogs;
 pub use argparse::*;
 pub use db::*;
 pub use setup::*;

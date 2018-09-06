@@ -11,8 +11,8 @@ pub mod graph;
 pub mod table;
 
 use self::dbfile::DBFile;
+use cogs;
 
-use std::env;
 use std::fmt;
 use std::fs;
 use std::path;
@@ -99,15 +99,8 @@ impl DB {
         // Check to see if a path was passed into the db builder, else get the
         // eups system variable
         let eups_path = match db_path {
-            Some(path) => { String::from(path) },
-            None => {
-                let mut path = env::var("EUPS_PATH").unwrap_or_else(|e|{
-                    println!("Problem loading eups path {}", e);
-                    process::exit(1);
-                    });
-                path.push_str("/ups_db/");
-                path
-            }
+            Some(path) => { PathBuf::from(path) },
+            None => cogs::get_eups_path_from_env()
         };
 
         let (directory, product_to_info, tags_to_info, product_to_tags) = build_db(eups_path.clone());
@@ -121,25 +114,13 @@ impl DB {
         let user_db_path = match user_tag_root{
             Some(user_path) => Some(PathBuf::from(user_path)),
             None => {
-                let user_home= env::home_dir();
-                if let Some(mut user_path) = user_home {
-                    user_path.push(".eups/ups_db");
-                    if user_path.is_dir(){
-                        Some(user_path)
-                    }
-                    else {
-                        None
-                    }
-                }
-                else {
-                    None
-                }
+                cogs::get_user_path_from_home()
             }
         };
 
         let user_db = match user_db_path {
             Some(user_path) => {
-                let (directory, product_to_info, tags_to_info, product_to_tags) = build_db(String::from(user_path.to_str().unwrap()));
+                let (directory, product_to_info, tags_to_info, product_to_tags) = build_db(user_path);
                 Some(DBImpl { directory: directory,
                               tag_to_product_info: tags_to_info,
                               product_to_version_info: product_to_info,
@@ -311,11 +292,10 @@ impl DB {
 }
 
 
-fn build_db(eups_path: String) -> (path::PathBuf,
+fn build_db(eups_path: PathBuf) -> (path::PathBuf,
                                        FnvHashMap<String, FnvHashMap<String, DBFile>>,
                                        FnvHashMap<String, FnvHashMap<String, DBFile>>,
                                        FnvHashMap<String, Vec<String>>){
-    let eups_path = path::PathBuf::from(eups_path);
     // Create channels that each of the threads will communicate over
     let (name_tx, name_rx) = mpsc::channel::<(String, path::PathBuf)>();
     let (tag_tx, tag_rx) = mpsc::channel::<(String, path::PathBuf)>();
