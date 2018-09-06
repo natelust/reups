@@ -185,7 +185,7 @@ impl DB {
         for db in self.iter() {
             if db.product_to_version_info.contains_key(product) && db.product_to_version_info[product].contains_key(version) {
                 let prod_dir = db.product_to_version_info[product][version].entry(& "PROD_DIR".to_string());
-                let ups_dir = db.product_to_version_info[product][version].entry(& "UPS_DIR".to_string());
+                let mut ups_dir = db.product_to_version_info[product][version].entry(& "UPS_DIR".to_string());
                 if prod_dir.is_none() || ups_dir.is_none() {
                     tables_vec.push(None);
                     continue;
@@ -195,6 +195,10 @@ impl DB {
                 product_clone.push_str(".table");
                 total.push(prod_dir.unwrap());
                 let total_only_prod = total.clone();
+                // hacky code to support bad eups product declatations
+                if ups_dir.as_ref().unwrap() == "none" {
+                    ups_dir = Some(String::from("ups"));
+                }
                 total.push(ups_dir.unwrap());
                 total.push(product_clone);
                 tables_vec.push(Some((total_only_prod, total)));
