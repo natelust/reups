@@ -2,6 +2,12 @@
 name = "reups"
 version = "0.1.1"
 authors = ["Nate Lust <nlust@astro.princeton.edu>"]
+description = "A clean implementation of the eups package management system in rust"
+repository = "https://github.com/natelust/reups"
+readme = "README.md"
+license = "MPLv2"
+license-file = "LICENSE"
+categories = ["development-tools"]
 
 [dependencies]
 clap = "2.31.2"
