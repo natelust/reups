@@ -13,4 +13,5 @@ mod cogs;
 pub use argparse::*;
 pub use db::*;
 pub use setup::*;
+pub use cogs::*;
 #[macro_use] extern crate lazy_static;
