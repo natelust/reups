@@ -6,16 +6,11 @@
 use fnv::FnvHashMap;
 use std::io;
 use std::path;
+use std::str;
 
 use std::cell::RefCell;
 use std::fs::File;
 use std::io::prelude::*;
-
-use regex::Regex;
-
-lazy_static! {
-    static ref KEY_REGEX: Regex = Regex::new(r"(?P<key>.*) = (?P<value>.*)").unwrap();
-}
 
 #[derive(Debug)]
 pub struct DBFile {
@@ -49,25 +44,22 @@ impl DBFile {
         }
     }
 
-
     fn load_file(& self) -> Result<(), io::Error> {
         let mut f = File::open(&self.path)?;
+        let file_len = f.metadata().unwrap().len();
 
-        let mut contents = String::new();
+        let mut contents = String::with_capacity(file_len as usize +1);
         f.read_to_string(&mut contents)?;
+
         for line in contents.as_str().lines() {
-            let cap = KEY_REGEX.captures(line);
-            match cap {
-                Some(c) => {
-                    let key = String::from(c["key"].trim());
-                    let value = String::from(c["value"].trim());
-                    self.contents.borrow_mut().insert(key, value);
-                },
-                None => {
-                    continue;
-                }
+            let split : Vec<&str> = line.split("=").collect();
+            if split.len() == 2 {
+                let key = String::from(split[0].trim());
+                let value = String::from(split[1].trim());
+                self.contents.borrow_mut().insert(key, value);
             }
         }
+
         Ok(())
     }
 }
