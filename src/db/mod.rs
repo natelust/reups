@@ -3,9 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  * Copyright Nate Lust 2018*/
 
-extern crate fnv;
-
-use self::fnv::FnvHashMap;
+use fnv::FnvHashMap;
 mod dbfile;
 pub mod graph;
 pub mod table;

@@ -4,7 +4,7 @@
  * Copyright Nate Lust 2018*/
 
 pub extern crate petgraph;
-use db::fnv::FnvHashMap;
+use fnv::FnvHashMap;
 
 use std::collections::HashSet;
 

@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  * Copyright Nate Lust 2018*/
 
-use db::fnv::FnvHashMap;
+use fnv::FnvHashMap;
 use regex::Regex;
 use std::path;
 use std::io;

@@ -4,6 +4,7 @@
  * Copyright Nate Lust 2018*/
 
 extern crate regex;
+extern crate fnv;
 #[macro_use]
 extern crate clap;
 #[macro_use]
