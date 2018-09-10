@@ -189,7 +189,7 @@ pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::A
     // Here we will process any of the global arguments in the future but for now there is
     // nothing so we do nothing but create the database. The global arguments might affect
     // construction in the future
-    let db = db::DB::new(None, None, None);
+    let db = db::DB::new(None, None, None, None);
 
     // We process local arguments here to set the state that will be used to setup a product
     // Create a vector for the tags to consider

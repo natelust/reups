@@ -19,11 +19,19 @@ pub struct DBFile {
 }
 
 impl DBFile {
-    pub fn new(path: path::PathBuf) -> DBFile {
-        DBFile {
-            path: path,
+    pub fn new(path: path::PathBuf, preload: bool) -> DBFile {
+        let db_file = DBFile {
+            path: path.clone(),
             contents: RefCell::new(FnvHashMap::default())
+        };
+        if preload {
+            db_file.load_file().unwrap_or_else(|_e| {
+                exit_with_message!(
+                    format!("Problem accessing {}, could not create database",
+                            path.to_str().unwrap()));
+            });
         }
+        db_file
     }
 
     pub fn entry(& self, key: & String) -> Option<String> {

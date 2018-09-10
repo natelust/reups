@@ -74,6 +74,13 @@ impl<'a> Iterator for DBIter<'a> {
     }
 }
 
+#[derive(Clone)]
+pub enum DBLoadControl {
+    Versions,
+    Tags,
+    All
+}
+
 // User visible database
 pub struct DB {
     system_db: DBImpl,
@@ -93,7 +100,7 @@ impl fmt::Debug for DB {
 }
 
 impl DB {
-    pub fn new(db_path: Option<& str>, user_tag_root: Option<& str>, def_stack_root: Option<& str>) -> DB {
+    pub fn new(db_path: Option<& str>, user_tag_root: Option<& str>, def_stack_root: Option<& str>, preload : Option<DBLoadControl>) -> DB {
         // Check to see if a path was passed into the db builder, else get the
         // eups system variable
         let eups_path = match db_path {
@@ -101,7 +108,7 @@ impl DB {
             None => cogs::get_eups_path_from_env()
         };
 
-        let (directory, product_to_info, tags_to_info, product_to_tags) = build_db(eups_path.clone());
+        let (directory, product_to_info, tags_to_info, product_to_tags) = build_db(eups_path.clone(), preload.clone());
         let system_db = DBImpl { directory: directory,
                              tag_to_product_info: tags_to_info,
                              product_to_version_info: product_to_info,
@@ -118,7 +125,7 @@ impl DB {
 
         let user_db = match user_db_path {
             Some(user_path) => {
-                let (directory, product_to_info, tags_to_info, product_to_tags) = build_db(user_path);
+                let (directory, product_to_info, tags_to_info, product_to_tags) = build_db(user_path, preload);
                 Some(DBImpl { directory: directory,
                               tag_to_product_info: tags_to_info,
                               product_to_version_info: product_to_info,
@@ -294,7 +301,7 @@ impl DB {
 }
 
 
-fn build_db(eups_path: PathBuf) -> (path::PathBuf,
+fn build_db(eups_path: PathBuf, load_options : Option<DBLoadControl>) -> (path::PathBuf,
                                        FnvHashMap<String, FnvHashMap<String, DBFile>>,
                                        FnvHashMap<String, FnvHashMap<String, DBFile>>,
                                        FnvHashMap<String, Vec<String>>){
@@ -307,6 +314,21 @@ fn build_db(eups_path: PathBuf) -> (path::PathBuf,
     // bundle the woker communication end points so that they can be looped over
     let worker_tx_vec = vec![worker1_tx, worker2_tx];
     let worker_rx_vec = vec![worker1_rx, worker2_rx];
+
+    let (mut load_version, mut load_tag) = (false, false);
+    match load_options {
+        Some(DBLoadControl::Versions) => {
+            load_version = true;
+        },
+        Some(DBLoadControl::Tags) => {
+            load_tag = true;
+        },
+        Some(DBLoadControl::All) => {
+            load_version = true;
+            load_tag = true;
+        },
+        None => ()
+    }
 
     let names_thread = thread::spawn(move ||{
         // #product -> #version -> struct(path, info)
@@ -321,7 +343,7 @@ fn build_db(eups_path: PathBuf) -> (path::PathBuf,
                 let version_str: Vec<&str> = version_file_name.split(".version").collect();
                 version = String::from(version_str[0]);
             }
-            version_hash.insert(version, DBFile::new(file));
+            version_hash.insert(version, DBFile::new(file, load_version));
         }
         product_hash
     });
@@ -343,7 +365,7 @@ fn build_db(eups_path: PathBuf) -> (path::PathBuf,
             let mut tags_vec = product_to_tags.entry(product.clone()).or_insert(Vec::new());
             tags_vec.push(tag.clone());
             let mut product_hash = tags_hash.entry(tag).or_insert(FnvHashMap::default());
-            product_hash.insert(product, DBFile::new(file));
+            product_hash.insert(product, DBFile::new(file, load_tag));
         }
         (tags_hash, product_to_tags)
     });
