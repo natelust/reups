@@ -158,6 +158,16 @@ impl DB {
 
     }
 
+    pub fn get_all_products(& self) -> Vec<String> {
+        // iterate over all dbs, getting a vector of keys of products, and append them to one
+        // overall vector
+        let return_vec : Vec<String> = vec![];
+        self.iter().fold(return_vec, |mut acc: Vec<String>, db: &DBImpl| {
+            acc.extend(db.product_to_tags.keys().map(|x|{x.clone()}));
+            acc
+        })
+    }
+
     pub fn get_db_directories(& self) -> Vec<PathBuf> {
         let mut paths = Vec::new();
         for db in self.iter() {
@@ -166,12 +176,24 @@ impl DB {
         paths
     }
 
-    pub fn product_versions(& self, product: & String){
+    pub fn product_versions(& self, product: & String) -> Vec<String>{
+        let mut product_versions = vec![];
         for db in self.iter() {
-            for key in db.product_to_version_info[product].keys() {
-                println!("{}", key);
+            if db.product_to_version_info.contains_key(product) {
+                product_versions.extend(db.product_to_version_info[product].keys().map(|x| x.clone()));
             }
         }
+        product_versions
+    }
+
+    pub fn product_tags(& self, product: & String) -> Vec<String> {
+        let mut tags_vec = vec![];
+        for db in self.iter() {
+            if db.product_to_tags.contains_key(product) {
+                tags_vec.extend(db.product_to_tags[product].clone());
+            }
+        }
+        tags_vec
     }
 
     pub fn get_table_from_version(& self, product: & String, version: & String) -> Option<table::Table> {

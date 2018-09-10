@@ -17,6 +17,9 @@ fn main() {
 "rsetup() {{
     eval $(reups setup \"$@\");
 }}");
+        },
+        ("list", Some(m)) => {
+            reups::list_command(m, &args);
         }
         _ => println!("{}",args.usage()),
     }
