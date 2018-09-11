@@ -355,8 +355,25 @@ fn build_db(eups_path: PathBuf, load_options : Option<DBLoadControl>) -> (path::
     let names_thread = thread::spawn(move ||{
         // #product -> #version -> struct(path, info)
         let mut product_hash: FnvHashMap<String, FnvHashMap<String, DBFile>> = FnvHashMap::default();
+
+        // create a pool of workers to make dbfiles
+        let mut tx_vec = vec![];
+        let mut threads_vec = vec![];
+        for _ in 0..2 {
+            let (tx, rx) = mpsc::channel::<(String, String, path::PathBuf, bool)>();
+            tx_vec.push(tx);
+            threads_vec.push(thread::spawn(move || {
+                let mut dbfiles = vec![];
+                for (version, product, path, preload) in rx {
+                    dbfiles.push((version, product, DBFile::new(path, preload)));
+                }
+                dbfiles
+            }));
+        }
+        // block to ensure chained iterator goes out of scope
+        {
+        let mut tx_vec_cycle = tx_vec.iter().cycle();
         for (product, file) in name_rx {
-            let mut version_hash = product_hash.entry(product).or_insert(FnvHashMap::default());
             let mut version;
             // The code below is scoped so that the borrow of file goes out scope and
             // the file can be moved into the DBFile constructor
@@ -365,7 +382,17 @@ fn build_db(eups_path: PathBuf, load_options : Option<DBLoadControl>) -> (path::
                 let version_str: Vec<&str> = version_file_name.split(".version").collect();
                 version = String::from(version_str[0]);
             }
-            version_hash.insert(version, DBFile::new(file, load_version));
+            tx_vec_cycle.next().unwrap().send((version, product, file, load_version)).unwrap();
+        }
+        }
+        // work is done collect from threads
+        drop(tx_vec);
+        for thread in threads_vec{
+            let result = thread.join().unwrap();
+            for (version, product, dbfile) in result {
+                let mut version_hash = product_hash.entry(product).or_insert(FnvHashMap::default());
+                version_hash.insert(version, dbfile);
+            }
         }
         product_hash
     });
@@ -374,6 +401,24 @@ fn build_db(eups_path: PathBuf, load_options : Option<DBLoadControl>) -> (path::
         // #tag -> #product -> (path, info)
         let mut tags_hash: FnvHashMap<String, FnvHashMap<String, DBFile>> = FnvHashMap::default();
         let mut product_to_tags : FnvHashMap<String, Vec<String>> = FnvHashMap::default();
+        //
+        // create a pool of workers to make dbfiles
+        let mut tx_vec = vec![];
+        let mut threads_vec = vec![];
+        for _ in 0..2 {
+            let (tx, rx) = mpsc::channel::<(String, String, path::PathBuf, bool)>();
+            tx_vec.push(tx);
+            threads_vec.push(thread::spawn(move || {
+                let mut dbfiles = vec![];
+                for (product, tag, path, preload) in rx {
+                    dbfiles.push((product, tag, DBFile::new(path, preload)));
+                }
+                dbfiles
+            }));
+        }
+        {
+        let mut tx_vec_cycle = tx_vec.iter().cycle();
+
         for (product, file) in tag_rx {
             let mut tag;
             // The code below is scoped so that the borrow of file goes out scope and
@@ -386,8 +431,17 @@ fn build_db(eups_path: PathBuf, load_options : Option<DBLoadControl>) -> (path::
             }
             let mut tags_vec = product_to_tags.entry(product.clone()).or_insert(Vec::new());
             tags_vec.push(tag.clone());
-            let mut product_hash = tags_hash.entry(tag).or_insert(FnvHashMap::default());
-            product_hash.insert(product, DBFile::new(file, load_tag));
+            tx_vec_cycle.next().unwrap().send((product, tag , file, load_tag)).unwrap();
+        }
+        }
+        // work is done, collect from threads
+        drop(tx_vec);
+        for thread in threads_vec {
+            let result = thread.join().unwrap();
+            for (product, tag, dbfile) in result {
+                let mut product_hash = tags_hash.entry(tag).or_insert(FnvHashMap::default());
+                product_hash.insert(product, dbfile);
+            }
         }
         (tags_hash, product_to_tags)
     });
