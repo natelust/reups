@@ -6,11 +6,9 @@
 use fnv::FnvHashMap;
 use std::io;
 use std::path;
-use std::str;
 
 use std::cell::RefCell;
-use std::fs::File;
-use std::io::prelude::*;
+use std::fs;
 
 #[derive(Debug)]
 pub struct DBFile {
@@ -24,6 +22,7 @@ impl DBFile {
             path: path.clone(),
             contents: RefCell::new(FnvHashMap::default())
         };
+
         if preload {
             db_file.load_file().unwrap_or_else(|_e| {
                 exit_with_message!(
@@ -53,22 +52,20 @@ impl DBFile {
     }
 
     fn load_file(& self) -> Result<(), io::Error> {
-        let mut f = File::open(&self.path)?;
-        let file_len = f.metadata().unwrap().len();
+        let contents = fs::read_to_string(&self.path)?;
 
-        let mut contents = String::with_capacity(file_len as usize +1);
-        f.read_to_string(&mut contents)?;
-
-        for line in contents.as_str().lines() {
-            let split : Vec<&str> = line.split("=").collect();
-            if split.len() == 2 {
-                let key = String::from(split[0].trim());
-                let value = String::from(split[1].trim());
-                self.contents.borrow_mut().insert(key, value);
+        for line in contents.lines() {
+            for (i, char) in line.char_indices() {
+                if char == '=' {
+                    let key = line[0..i].trim();
+                    let value = line[i+1..].trim();
+                    self.contents.borrow_mut().insert(key.to_owned(),
+                                                      value.to_owned());
+                    break;
+                }
             }
         }
 
         Ok(())
     }
 }
-
