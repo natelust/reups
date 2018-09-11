@@ -132,15 +132,32 @@ impl<'a> ListImpl<'a> {
                 let mut version_to_tags_vec : Vec<(String, Vec<&String>)> = version_to_tags.into_iter().collect();
                 version_to_tags_vec.sort_by(|tup1, tup2| tup1.0.cmp(&tup2.0));
                 for (ver, tags) in version_to_tags_vec {
-                    self.output_string.push_str(format!("{:25}{:>25}{:10}{:?}", product, ver, "", tags).as_str().trim());
+                    self.output_string.push_str(format!("{:25}{:>25}{:10}{}]", product, ver, "", tags.iter().fold(String::from("["), |acc, &x| {
+                        let name = if *x == "current" {
+                            "\x1b[96mcurrent\x1b[0m".to_owned()
+                        }
+                        else {
+                            (*x).clone()
+                        };
+                        acc + &name + ", "
+                    }).trim_right_matches(", ")).as_str().trim());
                     if self.current_products.contains(&(product.clone(), ver)) {
-                        self.output_string.push_str("    \x1b[31mSetup\x1b[0m");
+                        self.output_string.push_str("    \x1b[92mSetup\x1b[0m");
                     }
                     self.output_string.push_str("\n\n");
                 }
             },
             OnlyPrint::Tags => {
-                self.output_string.push_str(format!("{:25}{:10}{:?}", product, "", tags).as_str().trim());
+                self.output_string.push_str(format!("{:25}{:10}{}]", product, "", tags.iter().
+                                                    fold(String::from("["), |acc, x| {
+                                                        let name = if x == "current" {
+                                                            "\x1b[96mcurrent\x1b[0m"
+                                                        }
+                                                        else {
+                                                            &x
+                                                        };
+                                                        acc + name + ", "
+                                                    }).trim_right_matches(", ")).as_str().trim());
                 self.output_string.push_str("\n\n");
             },
             OnlyPrint::Versions => {
@@ -152,7 +169,7 @@ impl<'a> ListImpl<'a> {
                 self.output_string.push_str("[");
                 for version in versions {
                     if self.current_products.contains(&(product.clone(), version.clone())) {
-                        self.output_string.push_str(format!("\x1b[31m{}\x1b[0m", version).as_str());
+                        self.output_string.push_str(format!("\x1b[92m{}\x1b[0m", version).as_str());
                     }
                     else {
                         self.output_string.push_str(version.as_str());
