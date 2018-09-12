@@ -1,0 +1,10 @@
+0.2.0
+Change list coloring
+Create DBFiles in the database in threads
+Speed up reading dbfiles from disk
+Introduce list command
+Introduce option to force DBFile load at creation
+Speed up DBFile loading and parsing
+Move fnv crate import to module level
+Fix broken setup var
+
