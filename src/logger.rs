@@ -47,10 +47,9 @@ impl log::Log for Logger {
 
 pub fn build_logger(args: & argparse::ArgMatches, stderr: bool) {
     let level = match args.occurrences_of("verbose") {
-        0 => log::LevelFilter::Off,
+        0 => log::LevelFilter::Warn,
         1 => log::LevelFilter::Info,
-        2 => log::LevelFilter::Warn,
-        3 => log::LevelFilter::Debug,
+        2 => log::LevelFilter::Debug,
         _ => log::LevelFilter::Trace
 
     };
