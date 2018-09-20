@@ -76,6 +76,9 @@ impl<'a> ListImpl<'a> {
         else if self.sub_args.is_present("setup") {
             self.current_products.iter().map(|tup| tup.0.clone()).collect()
         }
+        else if self.sub_args.is_present("local") {
+            self.local_setups.keys().map(|k| k.clone()).collect()
+        }
         else {
             self.db.get_all_products()
         };

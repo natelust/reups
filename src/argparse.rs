@@ -46,11 +46,13 @@ fn build_list<'a, 'b>() -> App<'a, 'b> {
     return SubCommand::with_name("list")
                           .arg(Arg::with_name("product")
                                .help("Name of product to list (optional)")
-                               .index(1))
+                               .index(1)
+                               .conflicts_with_all(&["setup", "local"]))
                           .arg(Arg::with_name("setup")
                                .help("List only setup products")
                                .short("s")
-                               .long("setup"))
+                               .long("setup")
+                               .conflicts_with_all(&["product", "local"]))
                           .arg(Arg::with_name("tags")
                                .help("List only these tags (does not include current)")
                                .short("t")
@@ -64,7 +66,12 @@ fn build_list<'a, 'b>() -> App<'a, 'b> {
                           .arg(Arg::with_name("onlyVers")
                                .help("Only list product & versions (faster than tags and versions)")
                                .long("onlyVers")
-                               .conflicts_with("onlyTags"));
+                               .conflicts_with("onlyTags"))
+                          .arg(Arg::with_name("local")
+                               .help("Only list products that are setup as local products")
+                               .short("l")
+                               .long("local")
+                               .conflicts_with_all(&["product", "setup"]));
 }
 
 fn build_prep<'a, 'b>() -> App<'a, 'b> {
