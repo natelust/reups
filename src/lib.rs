@@ -8,14 +8,18 @@ extern crate fnv;
 #[macro_use]
 extern crate clap;
 #[macro_use]
+extern crate log;
+#[macro_use]
 mod cogs;
 mod argparse;
 mod db;
 mod setup;
 mod list;
+mod logger;
 pub use argparse::*;
 pub use db::*;
 pub use setup::*;
 pub use list::*;
 pub use cogs::*;
+pub use logger::*;
 #[macro_use] extern crate lazy_static;

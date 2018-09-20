@@ -34,7 +34,12 @@ fn build_setup<'a, 'b>() -> App<'a, 'b> {
                           .arg(Arg::with_name("inexact")
                                .help("Run setup with Inexact versions as specified in the table files")
                                .short("E")
-                               .long("inexact"));
+                               .long("inexact"))
+                           .arg(Arg::with_name("verbose")
+                                .short("v")
+                                .long("verbose")
+                                .multiple(true)
+                                .help("Sets the level of verbosity, multiple occurances increases verbosity"));
 }
 
 fn build_list<'a, 'b>() -> App<'a, 'b> {

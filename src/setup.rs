@@ -12,6 +12,7 @@ use std::fs;
 use db;
 use table;
 use argparse;
+use logger;
 
 #[cfg(target_os = "macos")]
 static SYSTEM_OS: &str = "Darwin64";
@@ -58,6 +59,7 @@ fn setup_table(product_version : &String, product_table: &table::Table, env_vars
     else {
         setup_string_vec.push(db_path.to_str().unwrap().to_string().replace("ups_db",""));
     }
+    info!("Setting up: {:<25}Version: {}", product_table.name, product_version);
     env_vars.insert(prod_dir_label, String::from(product_table.product_dir.to_str().unwrap()));
     env_vars.insert(setup_var, setup_string_vec.join("\\ "));
 
@@ -189,6 +191,7 @@ pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::A
     // Here we will process any of the global arguments in the future but for now there is
     // nothing so we do nothing but create the database. The global arguments might affect
     // construction in the future
+    logger::build_logger(sub_args, true);
     let db = db::DB::new(None, None, None, None);
 
     // We process local arguments here to set the state that will be used to setup a product
