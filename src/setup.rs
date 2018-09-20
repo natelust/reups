@@ -323,7 +323,13 @@ pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::A
                     },
                     (None, true) => continue,
                     (None, false) => {
-                        exit_with_message!(format!("Cannot find any acceptable table for {}", &name));
+                        if env::var(String::from("SETUP_")+&name.to_uppercase()).is_ok() {
+                            warn!("Product {} could not be found in the database, resolving dependency using setup version", &name);
+                            continue
+                        }
+                        else {
+                            exit_with_message!(format!("Cannot find any acceptable table for {}", &name));
+                        }
                     }
                 }
             }
