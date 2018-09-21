@@ -13,10 +13,7 @@ fn main() {
             reups::setup_command(m, &args);
         },
         ("prep", Some(_)) => {
-            println!(
-"rsetup() {{
-    eval $(reups setup \"$@\");
-}}");
+            println!("{}", reups::build_prep_string());
         },
         ("list", Some(m)) => {
             reups::list_command(m, &args);
