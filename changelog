@@ -1,3 +1,14 @@
+0.2.1
+Update reups version to 0.2.1
+Add subcommand to build shell completions
+Bump Clap version
+Add license to prep subcommand
+Move prep command and pass through help
+Add option to list only locally setup products
+Satisfy dependency with setup products if able
+Change default log level to Warn and above
+Add logger option to setup
+
 0.2.0
 Change list coloring
 Create DBFiles in the database in threads
