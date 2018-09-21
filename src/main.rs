@@ -17,7 +17,10 @@ fn main() {
         },
         ("list", Some(m)) => {
             reups::list_command(m, &args);
-        }
+        },
+        ("completions", Some(m)) => {
+            reups::write_completions_stdout(m.value_of("shell").unwrap());
+        },
         _ => println!("{}",args.usage()),
     }
 }

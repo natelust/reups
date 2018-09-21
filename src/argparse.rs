@@ -74,18 +74,32 @@ fn build_list<'a, 'b>() -> App<'a, 'b> {
                                .conflicts_with_all(&["product", "setup"]));
 }
 
+fn build_completions<'a, 'b>() -> App<'a, 'b> {
+    return SubCommand::with_name("completions")
+                          .about("Creates auto completeion scripts for given shell")
+                          .arg(Arg::with_name("shell")
+                               .required(true)
+                               .possible_values(&["bash", "fish", "zsh", "elvish"])
+                               .help("Shell to create completions for"));
+}
+
 fn build_prep<'a, 'b>() -> App<'a, 'b> {
     return SubCommand::with_name("prep");
 }
 
+pub fn build_cli() -> App<'static, 'static> {
+    App::new("Rust Eups")
+        .author("Nate Lust")
+        .about("Dynamic environment management")
+        .version(crate_version!())
+        .subcommand(build_setup())
+        .subcommand(build_prep())
+        .subcommand(build_list())
+        .subcommand(build_completions())
+}
+
 pub fn parse_args<'a> () -> ArgMatches<'a> {
-    let matches = App::new("Rust Eups")
-                           .author("Nate Lust")
-                           .about("Dynamic environment management")
-                           .version(crate_version!())
-                           .subcommand(build_setup())
-                           .subcommand(build_prep())
-                           .subcommand(build_list()).get_matches();
+    let matches = build_cli().get_matches();
     return matches;
 }
 
