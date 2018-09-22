@@ -6,7 +6,7 @@
 pub use clap::{ArgMatches};
 use clap::{Arg,App, SubCommand};
 
-fn build_setup<'a, 'b>() -> App<'a, 'b> {
+pub fn build_setup<'a, 'b>() -> App<'a, 'b> {
     return SubCommand::with_name("setup")
                           .arg(Arg::with_name("product")
                                .help("Product to setup")

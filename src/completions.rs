@@ -11,4 +11,8 @@ pub fn write_completions_stdout(shell : &str) {
                                              shell.parse().unwrap(),
                                              & mut io::stdout()
                                              );
+    argparse::build_setup().gen_completions_to("rsetup",
+                                             shell.parse().unwrap(),
+                                             & mut io::stdout()
+                                             );
 }
