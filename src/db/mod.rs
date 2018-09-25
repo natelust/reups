@@ -8,7 +8,6 @@
     database it provides encodes the tag, version, table file path relations
     between all the products reups is aware of.
  */
-
 use fnv::FnvHashMap;
 mod dbfile;
 pub mod graph;
@@ -17,14 +16,14 @@ pub mod table;
 use self::dbfile::DBFile;
 use cogs;
 
+use std::cell::RefCell;
 use std::fmt;
 use std::fs;
 use std::path;
-use std::process;
-use std::thread;
-use std::cell::RefCell;
 use std::path::PathBuf;
+use std::process;
 use std::sync::mpsc;
+use std::thread;
 
 /// Implementation of an database object. The outside visible database
 /// object, is comprised of some number of instances of these
@@ -33,7 +32,7 @@ struct DBImpl {
     directory: path::PathBuf,
     tag_to_product_info: FnvHashMap<String, FnvHashMap<String, DBFile>>,
     product_to_version_info: FnvHashMap<String, FnvHashMap<String, DBFile>>,
-    product_to_tags: FnvHashMap<String, Vec<String>>
+    product_to_tags: FnvHashMap<String, Vec<String>>,
 }
 
 /// Data structure to hold state related to iterating over a db object.
@@ -41,16 +40,16 @@ struct DBImpl {
 /// contained in the database, which at this point includes the main
 /// and user dbs
 struct DBIter<'a> {
-    inner: & 'a DB,
-    pos: usize
+    inner: &'a DB,
+    pos: usize,
 }
 
 /// Implementing the iterator type trait for DBIter so that the stuct
 /// can be used in places where iteration happens
 impl<'a> Iterator for DBIter<'a> {
-    type Item = & 'a DBImpl;
+    type Item = &'a DBImpl;
 
-    fn next(& mut self) -> Option<Self::Item> {
+    fn next(&mut self) -> Option<Self::Item> {
         // Match the position state variable to know where in the
         // iteration the iterable object is
         match self.pos {
@@ -58,7 +57,7 @@ impl<'a> Iterator for DBIter<'a> {
             0 => {
                 self.pos += 1;
                 Some(&self.inner.system_db)
-            },
+            }
             // This corresponds to the user db
             // This object is already an option, as there may not
             // be a user db, so this match will either return some
@@ -70,9 +69,7 @@ impl<'a> Iterator for DBIter<'a> {
                 self.inner.user_db.as_ref()
             }
             // Terminate the iterator if this branch is reached
-            _ => {
-                None
-            }
+            _ => None,
         }
     }
 }
@@ -82,7 +79,7 @@ impl<'a> Iterator for DBIter<'a> {
 pub enum DBLoadControl {
     Versions,
     Tags,
-    All
+    All,
 }
 
 /// Database object that library consumers interact though. This DB encodes all the
@@ -92,7 +89,7 @@ pub struct DB {
     system_db: DBImpl,
     user_db: Option<DBImpl>,
     stack_root: path::PathBuf,
-    cache: RefCell<FnvHashMap<(String, String), table::Table>>
+    cache: RefCell<FnvHashMap<(String, String), table::Table>>,
 }
 
 /// Describes how the db will be shown when written in a formatted
@@ -112,51 +109,58 @@ impl DB {
     /// DBLoadControl, which specifies which products are to be preloaded from disk at database
     /// creation time. Set the option to None if no products are to be loaded
     /// and
-    pub fn new(db_path: Option<& str>, user_tag_root: Option<& str>, def_stack_root: Option<& str>, preload : Option<DBLoadControl>) -> DB {
+    pub fn new(
+        db_path: Option<&str>,
+        user_tag_root: Option<&str>,
+        def_stack_root: Option<&str>,
+        preload: Option<DBLoadControl>,
+    ) -> DB {
         // Check to see if a path was passed into the db builder, else get the
         // eups system variable
         let eups_path = match db_path {
-            Some(path) => { PathBuf::from(path) },
-            None => cogs::get_eups_path_from_env()
+            Some(path) => PathBuf::from(path),
+            None => cogs::get_eups_path_from_env(),
         };
 
-        let (directory, product_to_info, tags_to_info, product_to_tags) = build_db(eups_path.clone(), preload.clone());
-        let system_db = DBImpl { directory: directory,
-                             tag_to_product_info: tags_to_info,
-                             product_to_version_info: product_to_info,
-                             product_to_tags: product_to_tags
+        let (directory, product_to_info, tags_to_info, product_to_tags) =
+            build_db(eups_path.clone(), preload.clone());
+        let system_db = DBImpl {
+            directory: directory,
+            tag_to_product_info: tags_to_info,
+            product_to_version_info: product_to_info,
+            product_to_tags: product_to_tags,
         };
 
         // Check if a user directory was supplied, if so implement a db, if not try to get a defaul, else record None
-        let user_db_path = match user_tag_root{
+        let user_db_path = match user_tag_root {
             Some(user_path) => Some(PathBuf::from(user_path)),
-            None => {
-                cogs::get_user_path_from_home()
-            }
+            None => cogs::get_user_path_from_home(),
         };
 
         let user_db = match user_db_path {
             Some(user_path) => {
-                let (directory, product_to_info, tags_to_info, product_to_tags) = build_db(user_path, preload);
-                Some(DBImpl { directory: directory,
-                              tag_to_product_info: tags_to_info,
-                              product_to_version_info: product_to_info,
-                              product_to_tags: product_to_tags })
-                }
-            None => {
-                None
+                let (directory, product_to_info, tags_to_info, product_to_tags) =
+                    build_db(user_path, preload);
+                Some(DBImpl {
+                    directory: directory,
+                    tag_to_product_info: tags_to_info,
+                    product_to_version_info: product_to_info,
+                    product_to_tags: product_to_tags,
+                })
             }
+            None => None,
         };
 
         // Check if a stack root was provided, else construct one relative to the parent of db_path
-        let stack_root = match def_stack_root{
+        let stack_root = match def_stack_root {
             Some(path) => path::PathBuf::from(path),
-            None => {
-                path::PathBuf::from(eups_path).parent().unwrap_or_else(||{
-                    println!("problem creating stack root" );
+            None => path::PathBuf::from(eups_path)
+                .parent()
+                .unwrap_or_else(|| {
+                    println!("problem creating stack root");
                     process::exit(1);
-                }).to_path_buf()
-            }
+                })
+                .to_path_buf(),
         };
         let cache = RefCell::new(FnvHashMap::default());
 
@@ -165,24 +169,24 @@ impl DB {
             system_db,
             user_db,
             stack_root,
-            cache
+            cache,
         }
-
     }
 
     /// Returns a vector containing the names of all the products that are known to the database.
-    pub fn get_all_products(& self) -> Vec<String> {
+    pub fn get_all_products(&self) -> Vec<String> {
         // iterate over all dbs, getting a vector of keys of products, and append them to one
         // overall vector
-        let return_vec : Vec<String> = vec![];
-        self.iter().fold(return_vec, |mut acc: Vec<String>, db: &DBImpl| {
-            acc.extend(db.product_to_tags.keys().map(|x|{x.clone()}));
-            acc
-        })
+        let return_vec: Vec<String> = vec![];
+        self.iter()
+            .fold(return_vec, |mut acc: Vec<String>, db: &DBImpl| {
+                acc.extend(db.product_to_tags.keys().map(|x| x.clone()));
+                acc
+            })
     }
 
     /// Returns the paths to the system and (optionally if one exists) user databases
-    pub fn get_db_directories(& self) -> Vec<PathBuf> {
+    pub fn get_db_directories(&self) -> Vec<PathBuf> {
         let mut paths = Vec::new();
         for db in self.iter() {
             paths.push(db.directory.clone());
@@ -191,18 +195,22 @@ impl DB {
     }
 
     /// Produces a vector of all the versions of the specified product
-    pub fn product_versions(& self, product: & String) -> Vec<String>{
+    pub fn product_versions(&self, product: &String) -> Vec<String> {
         let mut product_versions = vec![];
         for db in self.iter() {
             if db.product_to_version_info.contains_key(product) {
-                product_versions.extend(db.product_to_version_info[product].keys().map(|x| x.clone()));
+                product_versions.extend(
+                    db.product_to_version_info[product]
+                        .keys()
+                        .map(|x| x.clone()),
+                );
             }
         }
         product_versions
     }
 
     /// Outputs a vector of all tags corresponding to the specified product
-    pub fn product_tags(& self, product: & String) -> Vec<String> {
+    pub fn product_tags(&self, product: &String) -> Vec<String> {
         let mut tags_vec = vec![];
         for db in self.iter() {
             if db.product_to_tags.contains_key(product) {
@@ -213,23 +221,31 @@ impl DB {
     }
 
     /// Looks up the table corresponding to the product, version combination specified.
-    pub fn get_table_from_version(& self, product: & String, version: & String) -> Option<table::Table> {
+    pub fn get_table_from_version(
+        &self,
+        product: &String,
+        version: &String,
+    ) -> Option<table::Table> {
         // try getting from the db cache
         // block this so that the reference to cache goes out of scope once we are done
         {
             let cache_borrow = self.cache.borrow();
             let table_option = cache_borrow.get(&(product.clone(), version.clone()));
             if let Some(table_from_cache) = table_option {
-                return Some(table_from_cache.clone())
+                return Some(table_from_cache.clone());
             }
         }
 
         let mut tables_vec: Vec<Option<(path::PathBuf, path::PathBuf)>> = vec![];
 
         for db in self.iter() {
-            if db.product_to_version_info.contains_key(product) && db.product_to_version_info[product].contains_key(version) {
-                let prod_dir = db.product_to_version_info[product][version].entry(& "PROD_DIR".to_string());
-                let mut ups_dir = db.product_to_version_info[product][version].entry(& "UPS_DIR".to_string());
+            if db.product_to_version_info.contains_key(product)
+                && db.product_to_version_info[product].contains_key(version)
+            {
+                let prod_dir =
+                    db.product_to_version_info[product][version].entry(&"PROD_DIR".to_string());
+                let mut ups_dir =
+                    db.product_to_version_info[product][version].entry(&"UPS_DIR".to_string());
                 if prod_dir.is_none() || ups_dir.is_none() {
                     tables_vec.push(None);
                     continue;
@@ -251,21 +267,27 @@ impl DB {
 
         match tables_vec.len() {
             x if x > 0 => {
-                let (prod_dir, total) = tables_vec.remove(x-1).unwrap();
+                let (prod_dir, total) = tables_vec.remove(x - 1).unwrap();
                 let resolved_table = table::Table::new(product.clone(), total, prod_dir).ok();
-                self.cache.borrow_mut().insert((product.clone(), version.clone()), resolved_table.as_ref().unwrap().clone());
+                self.cache.borrow_mut().insert(
+                    (product.clone(), version.clone()),
+                    resolved_table.as_ref().unwrap().clone(),
+                );
                 resolved_table
-            },
-            _ => None
+            }
+            _ => None,
         }
     }
 
     /// Lists the flavors of a product corresponding to a specified product and version
-    pub fn get_flavors_from_version(& self, product : & String, version : & String) -> Vec<String> {
+    pub fn get_flavors_from_version(&self, product: &String, version: &String) -> Vec<String> {
         let mut flavors = Vec::new();
         for db in self.iter() {
-            if db.product_to_version_info.contains_key(product) && db.product_to_version_info[product].contains_key(version){
-                let flavor_option = db.product_to_version_info[product][version].entry(&String::from("FLAVOR"));
+            if db.product_to_version_info.contains_key(product)
+                && db.product_to_version_info[product].contains_key(version)
+            {
+                let flavor_option =
+                    db.product_to_version_info[product][version].entry(&String::from("FLAVOR"));
                 if let Some(flav) = flavor_option {
                     flavors.push(flav);
                 }
@@ -275,16 +297,16 @@ impl DB {
     }
 
     /// Looks up all the versions which correspond to specified prodcut and tag
-    pub fn get_versions_from_tag(& self, product: & String, tag: Vec<& String>) -> Vec<String> {
-         // store versions found in the main db and the user db
+    pub fn get_versions_from_tag(&self, product: &String, tag: Vec<&String>) -> Vec<String> {
+        // store versions found in the main db and the user db
         let mut versions_vec: Vec<String> = vec![];
         // look up the products
         for db in self.iter() {
             for t in &tag {
-                if db.tag_to_product_info.contains_key(t.clone()){
+                if db.tag_to_product_info.contains_key(t.clone()) {
                     let ref tag_map = db.tag_to_product_info[t.clone()];
                     if let Some(product_file) = tag_map.get(product) {
-                        let version = product_file.entry(& "VERSION".to_string());
+                        let version = product_file.entry(&"VERSION".to_string());
                         versions_vec.push(version.unwrap());
                         break;
                     }
@@ -295,7 +317,7 @@ impl DB {
     }
 
     /// Looks up a table file given a product and tag
-    pub fn get_table_from_tag(& self, product: & String, tag: Vec<& String>) -> Option<table::Table>{
+    pub fn get_table_from_tag(&self, product: &String, tag: Vec<&String>) -> Option<table::Table> {
         let versions_vec = self.get_versions_from_tag(product, tag);
         // use the last element, as this will select the user tag if one is present else
         // it will return the result from the main tag
@@ -303,26 +325,25 @@ impl DB {
         // object. The real Option to worry about is the one that is contained in the vec
 
         match versions_vec.len() {
-            x if x >0 => {
-                let mut res :Option<table::Table> = None;
-                for ver in versions_vec.iter().rev(){
-                        res = self.get_table_from_version(product, ver);
-                        // if we found the product in a given database, then bail out, no need
-                        // to search further
-                        if res.is_some() {
-                            break;
-                        }
+            x if x > 0 => {
+                let mut res: Option<table::Table> = None;
+                for ver in versions_vec.iter().rev() {
+                    res = self.get_table_from_version(product, ver);
+                    // if we found the product in a given database, then bail out, no need
+                    // to search further
+                    if res.is_some() {
+                        break;
+                    }
                 }
                 res
-            },
-            _ => None
+            }
+            _ => None,
         }
     }
 
-
     /// Creates an iterator over the database object. This will loop over the system
     /// and user databases
-    fn iter<'a>(& 'a self) -> DBIter<'a> {
+    fn iter<'a>(&'a self) -> DBIter<'a> {
         DBIter {
             inner: self,
             pos: 0,
@@ -330,13 +351,12 @@ impl DB {
     }
 
     /// Look up if a given product exists in the database
-    pub fn has_product(& self, product: & String) -> bool {
+    pub fn has_product(&self, product: &String) -> bool {
         // iterate over the global and user db
         for db in self.iter() {
-            if db.product_to_version_info.contains_key(product){
+            if db.product_to_version_info.contains_key(product) {
                 return true;
-            }
-            else if db.product_to_tags.contains_key(product){
+            } else if db.product_to_tags.contains_key(product) {
                 return true;
             }
         }
@@ -344,22 +364,26 @@ impl DB {
     }
 }
 
-
 /// This function builds all the components which go into the creation of a database.
 /// The functionality was sufficiently complex that it was factored out of new for the
 /// sake of readability. The function makes heavy use of system threads to create worker
 /// pools to speed up the process of reading all the database information off disk, as
 /// io is inherently an asynchronous process.
-fn build_db(eups_path: PathBuf, load_options : Option<DBLoadControl>) -> (path::PathBuf,
-                                       FnvHashMap<String, FnvHashMap<String, DBFile>>,
-                                       FnvHashMap<String, FnvHashMap<String, DBFile>>,
-                                       FnvHashMap<String, Vec<String>>){
+fn build_db(
+    eups_path: PathBuf,
+    load_options: Option<DBLoadControl>,
+) -> (
+    path::PathBuf,
+    FnvHashMap<String, FnvHashMap<String, DBFile>>,
+    FnvHashMap<String, FnvHashMap<String, DBFile>>,
+    FnvHashMap<String, Vec<String>>,
+) {
     // Create channels that each of the threads will communicate over
     let (name_tx, name_rx) = mpsc::channel::<(String, path::PathBuf)>();
     let (tag_tx, tag_rx) = mpsc::channel::<(String, path::PathBuf)>();
     let (worker1_tx, worker1_rx) = mpsc::channel::<path::PathBuf>();
     let (worker2_tx, worker2_rx) = mpsc::channel::<path::PathBuf>();
-    
+
     // bundle the woker communication end points so that they can be looped over
     let worker_tx_vec = vec![worker1_tx, worker2_tx];
     let worker_rx_vec = vec![worker1_rx, worker2_rx];
@@ -368,20 +392,21 @@ fn build_db(eups_path: PathBuf, load_options : Option<DBLoadControl>) -> (path::
     match load_options {
         Some(DBLoadControl::Versions) => {
             load_version = true;
-        },
+        }
         Some(DBLoadControl::Tags) => {
             load_tag = true;
-        },
+        }
         Some(DBLoadControl::All) => {
             load_version = true;
             load_tag = true;
-        },
-        None => ()
+        }
+        None => (),
     }
 
-    let names_thread = thread::spawn(move ||{
+    let names_thread = thread::spawn(move || {
         // #product -> #version -> struct(path, info)
-        let mut product_hash: FnvHashMap<String, FnvHashMap<String, DBFile>> = FnvHashMap::default();
+        let mut product_hash: FnvHashMap<String, FnvHashMap<String, DBFile>> =
+            FnvHashMap::default();
 
         // create a pool of workers to make dbfiles
         let mut tx_vec = vec![];
@@ -399,22 +424,26 @@ fn build_db(eups_path: PathBuf, load_options : Option<DBLoadControl>) -> (path::
         }
         // block to ensure chained iterator goes out of scope
         {
-        let mut tx_vec_cycle = tx_vec.iter().cycle();
-        for (product, file) in name_rx {
-            let mut version;
-            // The code below is scoped so that the borrow of file goes out scope and
-            // the file can be moved into the DBFile constructor
-            {
-                let version_file_name = file.file_name().unwrap().to_str().unwrap();
-                let version_str: Vec<&str> = version_file_name.split(".version").collect();
-                version = String::from(version_str[0]);
+            let mut tx_vec_cycle = tx_vec.iter().cycle();
+            for (product, file) in name_rx {
+                let mut version;
+                // The code below is scoped so that the borrow of file goes out scope and
+                // the file can be moved into the DBFile constructor
+                {
+                    let version_file_name = file.file_name().unwrap().to_str().unwrap();
+                    let version_str: Vec<&str> = version_file_name.split(".version").collect();
+                    version = String::from(version_str[0]);
+                }
+                tx_vec_cycle
+                    .next()
+                    .unwrap()
+                    .send((version, product, file, load_version))
+                    .unwrap();
             }
-            tx_vec_cycle.next().unwrap().send((version, product, file, load_version)).unwrap();
-        }
         }
         // work is done collect from threads
         drop(tx_vec);
-        for thread in threads_vec{
+        for thread in threads_vec {
             let result = thread.join().unwrap();
             for (version, product, dbfile) in result {
                 let mut version_hash = product_hash.entry(product).or_insert(FnvHashMap::default());
@@ -424,10 +453,10 @@ fn build_db(eups_path: PathBuf, load_options : Option<DBLoadControl>) -> (path::
         product_hash
     });
 
-    let tags_thread = thread::spawn(move ||{
+    let tags_thread = thread::spawn(move || {
         // #tag -> #product -> (path, info)
         let mut tags_hash: FnvHashMap<String, FnvHashMap<String, DBFile>> = FnvHashMap::default();
-        let mut product_to_tags : FnvHashMap<String, Vec<String>> = FnvHashMap::default();
+        let mut product_to_tags: FnvHashMap<String, Vec<String>> = FnvHashMap::default();
         //
         // create a pool of workers to make dbfiles
         let mut tx_vec = vec![];
@@ -444,22 +473,25 @@ fn build_db(eups_path: PathBuf, load_options : Option<DBLoadControl>) -> (path::
             }));
         }
         {
-        let mut tx_vec_cycle = tx_vec.iter().cycle();
+            let mut tx_vec_cycle = tx_vec.iter().cycle();
 
-        for (product, file) in tag_rx {
-            let mut tag;
-            // The code below is scoped so that the borrow of file goes out scope and
-            // the file can be moved into the DBFile constructor
-            {
-                let tag_file_name = file.file_name().unwrap().to_str().unwrap();
-                let tag_str: Vec<&str> = tag_file_name.split(".chain").collect();
-                tag = String::from(tag_str[0]);
-
+            for (product, file) in tag_rx {
+                let mut tag;
+                // The code below is scoped so that the borrow of file goes out scope and
+                // the file can be moved into the DBFile constructor
+                {
+                    let tag_file_name = file.file_name().unwrap().to_str().unwrap();
+                    let tag_str: Vec<&str> = tag_file_name.split(".chain").collect();
+                    tag = String::from(tag_str[0]);
+                }
+                let mut tags_vec = product_to_tags.entry(product.clone()).or_insert(Vec::new());
+                tags_vec.push(tag.clone());
+                tx_vec_cycle
+                    .next()
+                    .unwrap()
+                    .send((product, tag, file, load_tag))
+                    .unwrap();
             }
-            let mut tags_vec = product_to_tags.entry(product.clone()).or_insert(Vec::new());
-            tags_vec.push(tag.clone());
-            tx_vec_cycle.next().unwrap().send((product, tag , file, load_tag)).unwrap();
-        }
         }
         // work is done, collect from threads
         drop(tx_vec);
@@ -474,16 +506,17 @@ fn build_db(eups_path: PathBuf, load_options : Option<DBLoadControl>) -> (path::
     });
 
     // Create a worker "pool" to list and sort directories passed to them, passing off files
-    // by type to other threads which accumulate 
+    // by type to other threads which accumulate
     let mut worker_threads = vec![];
     for reciver in worker_rx_vec {
-
         let name_tx_clone = mpsc::Sender::clone(&name_tx);
         let tag_tx_clone = mpsc::Sender::clone(&tag_tx);
 
         worker_threads.push(thread::spawn(move || {
             for entry in reciver {
-                if !entry.is_dir() { continue; }
+                if !entry.is_dir() {
+                    continue;
+                }
                 let entry_name = String::from(entry.file_name().unwrap().to_str().unwrap());
                 let contents = fs::read_dir(entry).expect("problem in worker thread read_dir");
                 for file in contents {
@@ -492,8 +525,7 @@ fn build_db(eups_path: PathBuf, load_options : Option<DBLoadControl>) -> (path::
                     let message = (entry_name.clone(), obj.path().clone());
                     if obj_name.ends_with(".version") {
                         name_tx_clone.send(message).unwrap();
-                    }
-                    else if obj_name.ends_with(".chain") {
+                    } else if obj_name.ends_with(".chain") {
                         tag_tx_clone.send(message).unwrap();
                     }
                 }
@@ -507,7 +539,11 @@ fn build_db(eups_path: PathBuf, load_options : Option<DBLoadControl>) -> (path::
         // that the work will be distributed to each worker in sequence
         let mut worker_iter = worker_tx_vec.iter().cycle();
         for entry in fs::read_dir(eups_path.clone()).expect("issue in main list") {
-            worker_iter.next().unwrap().send(entry.unwrap().path()).unwrap();
+            worker_iter
+                .next()
+                .unwrap()
+                .send(entry.unwrap().path())
+                .unwrap();
         }
     }
 
@@ -525,7 +561,7 @@ fn build_db(eups_path: PathBuf, load_options : Option<DBLoadControl>) -> (path::
 
     // collect the results of the accumulators
     let product_to_info = names_thread.join().unwrap();
-    let (tags_to_info, product_to_tags)  = tags_thread.join().unwrap();
+    let (tags_to_info, product_to_tags) = tags_thread.join().unwrap();
 
     (eups_path, product_to_info, tags_to_info, product_to_tags)
 }

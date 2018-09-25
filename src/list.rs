@@ -4,9 +4,9 @@
  * Copyright Nate Lust 2018*/
 
 use argparse;
-use std::env;
 use db;
 use fnv::{FnvHashMap, FnvHashSet};
+use std::env;
 
 /**
  * Lists info about products defined in the product database
@@ -16,11 +16,9 @@ use fnv::{FnvHashMap, FnvHashSet};
  * command line, packaged and sent here. The arguments are defined in the
  * argparse module.
  */
-pub fn list_command(sub_args: & argparse::ArgMatches,
-                    _main_args: & argparse::ArgMatches) {
+pub fn list_command(sub_args: &argparse::ArgMatches, _main_args: &argparse::ArgMatches) {
     let mut lister = ListImpl::new(sub_args, _main_args);
     lister.run();
-
 }
 
 /// This enum controls if the list command shows tags, versions, or both
@@ -28,7 +26,7 @@ pub fn list_command(sub_args: & argparse::ArgMatches,
 enum OnlyPrint {
     Tags,
     Versions,
-    All
+    All,
 }
 
 /**
@@ -38,33 +36,36 @@ enum OnlyPrint {
  * command.
  */
 struct ListImpl<'a> {
-    sub_args: & 'a argparse::ArgMatches<'a>,
-    _main_args: & 'a argparse::ArgMatches<'a>,
+    sub_args: &'a argparse::ArgMatches<'a>,
+    _main_args: &'a argparse::ArgMatches<'a>,
     output_string: String,
     current_products: FnvHashSet<(String, String)>,
     local_setups: FnvHashMap<String, String>,
-    db : db::DB,
-    tags : Option<Vec<String>>,
+    db: db::DB,
+    tags: Option<Vec<String>>,
 }
 
 impl<'a> ListImpl<'a> {
     /** Creates a LIstImpl struct given argument matches from the command line
      */
-    fn new(sub_args : & 'a argparse::ArgMatches<'a>, _main_args : & 'a argparse::ArgMatches<'a>) -> ListImpl<'a> {
+    fn new(
+        sub_args: &'a argparse::ArgMatches<'a>,
+        _main_args: &'a argparse::ArgMatches<'a>,
+    ) -> ListImpl<'a> {
         // Here we will process any of the global arguments in the future but for now there is
         // nothing so we do nothing but create the database. The global arguments might affect
         // construction in the future
 
         // cheat and look at the sub_args here to see if all products are listing all products or not. If
         // not, dont preload tag files in the database as this will slow things down
-        let preload = if sub_args.is_present("product") ||
-            sub_args.is_present("setup") ||
-            sub_args.is_present("tags") ||
-            sub_args.is_present("onlyTags") ||
-            sub_args.is_present("onlyVers"){
+        let preload = if sub_args.is_present("product")
+            || sub_args.is_present("setup")
+            || sub_args.is_present("tags")
+            || sub_args.is_present("onlyTags")
+            || sub_args.is_present("onlyVers")
+        {
             None
-        }
-        else {
+        } else {
             // Mark the database to preload all the tag files off disk
             Some(db::DBLoadControl::Tags)
         };
@@ -76,7 +77,7 @@ impl<'a> ListImpl<'a> {
         // Hold tag information
         let tags = None;
         // create the object
-        ListImpl{
+        ListImpl {
             sub_args,
             _main_args,
             output_string,
@@ -90,14 +91,17 @@ impl<'a> ListImpl<'a> {
     /// Runs the ListImpl over arguments given on the command line, and information
     /// gained from environment variables. Its result is the requested information is
     /// printed out to the user in the console.
-    fn run(& mut self) {
+    fn run(&mut self) {
         // If the user specified a specific product only generate output for that product
         let mut product_vec = if self.sub_args.is_present("product") {
-           vec![self.sub_args.value_of("product").unwrap().to_string()] 
+            vec![self.sub_args.value_of("product").unwrap().to_string()]
         }
         // If the user specifed they want only setup products, get the list of those to display
         else if self.sub_args.is_present("setup") {
-            self.current_products.iter().map(|tup| tup.0.clone()).collect()
+            self.current_products
+                .iter()
+                .map(|tup| tup.0.clone())
+                .collect()
         }
         // If the user wants only products that have been locally setup, get the list of those
         // products
@@ -110,13 +114,11 @@ impl<'a> ListImpl<'a> {
         };
 
         // check if we should restrict printing
-        let select_printing = if self.sub_args.is_present ("onlyTags") {
+        let select_printing = if self.sub_args.is_present("onlyTags") {
             OnlyPrint::Tags
-        }
-        else if self.sub_args.is_present("onlyVers") {
+        } else if self.sub_args.is_present("onlyVers") {
             OnlyPrint::Versions
-        }
-        else {
+        } else {
             OnlyPrint::All
         };
 
@@ -145,16 +147,15 @@ impl<'a> ListImpl<'a> {
      * all the information required about the product from the database, formats
      * it, and appends it to the output string.
      */
-    fn print_product(& mut self, product: &String, select_printing : OnlyPrint){
+    fn print_product(&mut self, product: &String, select_printing: OnlyPrint) {
         // If the user supplied tags, use those when determining the tags and
         // versions to print, else grab all tags associated with the given product
         let tags = if self.tags.is_some() {
             self.tags.as_ref().unwrap().clone()
-        }
-        else {
+        } else {
             self.db.product_tags(product)
         };
-        
+
         // Switch on which printing is to be done, only tags, only versons, or all
         match select_printing {
             OnlyPrint::All => {
@@ -164,7 +165,7 @@ impl<'a> ListImpl<'a> {
                 let mut version_to_tags = FnvHashMap::default();
                 for tag in tags.iter() {
                     if let OnlyPrint::All = select_printing {
-                        let versions = self.db.get_versions_from_tag(product, vec![tag]); 
+                        let versions = self.db.get_versions_from_tag(product, vec![tag]);
                         for v in versions {
                             version_to_tags.entry(v).or_insert(vec![]).push(tag);
                         }
@@ -176,21 +177,32 @@ impl<'a> ListImpl<'a> {
                 }
 
                 // Turn the hashmap into a vector
-                let mut version_to_tags_vec : Vec<(String, Vec<&String>)> = version_to_tags.into_iter().collect();
+                let mut version_to_tags_vec: Vec<(String, Vec<&String>)> =
+                    version_to_tags.into_iter().collect();
                 // Sort the versions vector by version
                 version_to_tags_vec.sort_by(|tup1, tup2| tup1.0.cmp(&tup2.0));
                 // Iterate over and print results
                 for (ver, tags) in version_to_tags_vec {
-                    self.output_string.push_str(format!("{:25}{:>25}{:10}{}]", product, ver, "", tags.iter().fold(String::from("["), |acc, &x| {
-                        // if the tag is current, color the string
-                        let name = if *x == "current" {
-                            "\x1b[96mcurrent\x1b[0m".to_owned()
-                        }
-                        else {
-                            (*x).clone()
-                        };
-                        acc + &name + ", "
-                    }).trim_right_matches(", ")).as_str().trim());
+                    self.output_string.push_str(
+                        format!(
+                            "{:25}{:>25}{:10}{}]",
+                            product,
+                            ver,
+                            "",
+                            tags.iter()
+                                .fold(String::from("["), |acc, &x| {
+                                    // if the tag is current, color the string
+                                    let name = if *x == "current" {
+                                        "\x1b[96mcurrent\x1b[0m".to_owned()
+                                    } else {
+                                        (*x).clone()
+                                    };
+                                    acc + &name + ", "
+                                })
+                                .trim_right_matches(", ")
+                        ).as_str()
+                            .trim(),
+                    );
                     // Check if this product and version match any that are setup,
                     // and if so add a colored setup string
                     if self.current_products.contains(&(product.clone(), ver)) {
@@ -198,32 +210,44 @@ impl<'a> ListImpl<'a> {
                     }
                     self.output_string.push_str("\n\n");
                 }
-            },
+            }
             OnlyPrint::Tags => {
-                self.output_string.push_str(format!("{:25}{:10}{}]", product, "", tags.iter().
-                                                    fold(String::from("["), |acc, x| {
-                                                        let name = if x == "current" {
-                                                            "\x1b[96mcurrent\x1b[0m"
-                                                        }
-                                                        else {
-                                                            &x
-                                                        };
-                                                        acc + name + ", "
-                                                    }).trim_right_matches(", ")).as_str().trim());
+                self.output_string.push_str(
+                    format!(
+                        "{:25}{:10}{}]",
+                        product,
+                        "",
+                        tags.iter()
+                            .fold(String::from("["), |acc, x| {
+                                let name = if x == "current" {
+                                    "\x1b[96mcurrent\x1b[0m"
+                                } else {
+                                    &x
+                                };
+                                acc + name + ", "
+                            })
+                            .trim_right_matches(", ")
+                    ).as_str()
+                        .trim(),
+                );
                 self.output_string.push_str("\n\n");
-            },
+            }
             OnlyPrint::Versions => {
                 let mut versions = self.db.product_versions(product);
                 if let Some(local) = self.local_setups.get(product) {
                     versions.push(local.clone());
                 }
-                self.output_string.push_str(format!("{:25}{:10}", product, "").as_str());
+                self.output_string
+                    .push_str(format!("{:25}{:10}", product, "").as_str());
                 self.output_string.push_str("[");
                 for version in versions {
-                    if self.current_products.contains(&(product.clone(), version.clone())) {
-                        self.output_string.push_str(format!("\x1b[92m{}\x1b[0m", version).as_str());
-                    }
-                    else {
+                    if self
+                        .current_products
+                        .contains(&(product.clone(), version.clone()))
+                    {
+                        self.output_string
+                            .push_str(format!("\x1b[92m{}\x1b[0m", version).as_str());
+                    } else {
                         self.output_string.push_str(version.as_str());
                     }
                     self.output_string.push_str(", ");
@@ -254,7 +278,7 @@ fn find_setup_products() -> (FnvHashSet<(String, String)>, FnvHashMap<String, St
                 // The value corresponding to a setup product should at least have
                 // a Name and a version, if not there was an issue with that variable
                 eprintln!("Warning, problem parsing {} skipping", var);
-                continue
+                continue;
             }
             // the first element is the product that is setup, the second is version
             product_set.insert((value_vec[0].to_string(), value_vec[1].to_string()));

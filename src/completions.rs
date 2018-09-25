@@ -3,8 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  * Copyright Nate Lust 2018*/
 
-use std::io;
 use argparse;
+use std::io;
 
 /**
  * The completions subcommand invokes this function with the shell variable
@@ -17,17 +17,11 @@ use argparse;
  * The resulting scripts are output to stdout so the user has the ability
  * to pipe them to the appropriate location.
  */
-pub fn write_completions_stdout(shell : &str) {
+pub fn write_completions_stdout(shell: &str) {
     // Generate completions for the main reups program for all subcommands
-    argparse::build_cli().gen_completions_to("reups",
-                                             shell.parse().unwrap(),
-                                             & mut io::stdout()
-                                             );
+    argparse::build_cli().gen_completions_to("reups", shell.parse().unwrap(), &mut io::stdout());
     // Generate conpletions for just the setup subcommand and bind these
     // to the rsetup string. This lets auto completion work for the rsetup
     // shell function
-    argparse::build_setup().gen_completions_to("rsetup",
-                                             shell.parse().unwrap(),
-                                             & mut io::stdout()
-                                             );
+    argparse::build_setup().gen_completions_to("rsetup", shell.parse().unwrap(), &mut io::stdout());
 }

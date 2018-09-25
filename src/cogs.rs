@@ -24,7 +24,7 @@ macro_rules! exit_with_message {
         use std::process::exit;
         eprintln!("{}", $message);
         exit(1);
-    }
+    };
 }
 
 /// Returns the eups system path as determined from the EUPS_PATH environment variable.
@@ -33,10 +33,10 @@ macro_rules! exit_with_message {
 /// character. This function will return the first database path, as it should be the most
 /// recently added to the environment.
 pub fn get_eups_path_from_env() -> PathBuf {
-    let env_var = env::var("EUPS_PATH").unwrap_or_else(|e|{
+    let env_var = env::var("EUPS_PATH").unwrap_or_else(|e| {
         exit_with_message!(format!("Problem loading eups path: {}", e));
     });
-    let eups_path_vec : Vec<&str> = env_var.split(":").collect();
+    let eups_path_vec: Vec<&str> = env_var.split(":").collect();
     // only return the first member of the vec, which should be the most
     // recently added eups path
     let eups_path_option = eups_path_vec.first();
@@ -47,23 +47,21 @@ pub fn get_eups_path_from_env() -> PathBuf {
         }
     };
     eups_path.push("ups_db");
-    if eups_path.is_dir(){
+    if eups_path.is_dir() {
         eups_path
-    }
-    else {
+    } else {
         exit_with_message!("Eups path defined in env var does not appear to be a directory");
     }
 }
 
 /// Returns the path to a user database, defined in users home directory, if one is present.
 pub fn get_user_path_from_home() -> Option<PathBuf> {
-    let user_home= env::home_dir();
+    let user_home = env::home_dir();
     let mut user_path = user_home?;
     user_path.push(".eups/ups_db");
     if user_path.is_dir() {
         Some(user_path)
-    }
-    else {
+    } else {
         None
     }
 }

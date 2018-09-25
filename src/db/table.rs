@@ -5,10 +5,10 @@
 
 use fnv::FnvHashMap;
 use regex::Regex;
-use std::path;
-use std::io;
 use std::fs::File;
+use std::io;
 use std::io::prelude::*;
+use std::path;
 
 /**!
   A Table object is the in memory representation of a products table file.
@@ -34,7 +34,7 @@ lazy_static! {
 #[derive(Clone)]
 pub enum VersionType {
     Exact,
-    Inexact
+    Inexact,
 }
 
 /// Enum to describ the action of an environment variable, prepend or append to the
@@ -42,7 +42,7 @@ pub enum VersionType {
 #[derive(Debug, Clone)]
 pub enum EnvActionType {
     Prepend,
-    Append
+    Append,
 }
 
 /// Deps describes if a product is a required or optional dependency. Required
@@ -50,7 +50,7 @@ pub enum EnvActionType {
 #[derive(Debug, Clone)]
 pub struct Deps {
     pub required: FnvHashMap<String, String>,
-    pub optional: FnvHashMap<String, String>
+    pub optional: FnvHashMap<String, String>,
 }
 
 /// Structure containing all the information about an on disk table file
@@ -61,14 +61,17 @@ pub struct Table {
     pub product_dir: path::PathBuf,
     pub exact: Option<Deps>,
     pub inexact: Option<Deps>,
-    pub env_var: FnvHashMap<String, (EnvActionType, String)>
+    pub env_var: FnvHashMap<String, (EnvActionType, String)>,
 }
 
 impl Table {
     /// Creates a new Table object given the product name to assign, the path to the
     /// table file, and the directory the product is located in
-    pub fn new(name: String, path: path::PathBuf, prod_dir: path::PathBuf)
-        -> Result<Table, io::Error>{
+    pub fn new(
+        name: String,
+        path: path::PathBuf,
+        prod_dir: path::PathBuf,
+    ) -> Result<Table, io::Error> {
         let mut f = File::open(path.clone())?;
         let mut contents = String::new();
         f.read_to_string(&mut contents)?;
@@ -78,27 +81,35 @@ impl Table {
         // a proper static, this only happens at first dereference. These are
         // defined as statics because they will remain between different tables
         // being created
-        let exact = Table::extract_setup(contents.as_str(),
-                                  &*EXACT);
+        let exact = Table::extract_setup(contents.as_str(), &*EXACT);
         // Get the inexact mapping
-        let inexact = Table::extract_setup(contents.as_str(),
-                                    &*INEXACT);
+        let inexact = Table::extract_setup(contents.as_str(), &*INEXACT);
         let mut env_var = FnvHashMap::default();
-        let env_re_vec : Vec<& Regex> = vec![&*ENV_PREPEND, &*ENV_APPEND];
-        for (re, action) in env_re_vec.iter().zip([EnvActionType::Prepend, EnvActionType::Append].iter()){
-            for cap in re.captures_iter(contents.as_str()){
+        let env_re_vec: Vec<&Regex> = vec![&*ENV_PREPEND, &*ENV_APPEND];
+        for (re, action) in env_re_vec
+            .iter()
+            .zip([EnvActionType::Prepend, EnvActionType::Append].iter())
+        {
+            for cap in re.captures_iter(contents.as_str()) {
                 let var = String::from(&cap["var"]);
                 let target = String::from(&cap["target"]);
                 let final_target = target.replace("${PRODUCT_DIR}", prod_dir.to_str().unwrap());
                 env_var.insert(var, (action.clone(), final_target));
             }
         }
-        Ok(Table {name: name, path: path, product_dir: prod_dir, exact: exact, inexact: inexact, env_var: env_var})
+        Ok(Table {
+            name: name,
+            path: path,
+            product_dir: prod_dir,
+            exact: exact,
+            inexact: inexact,
+            env_var: env_var,
+        })
     }
 
     /// Extracts the part of the table file that is related to the dependencies of the
     /// table file
-    fn extract_setup(input: &str, re: & Regex) -> Option<Deps> {
+    fn extract_setup(input: &str, re: &Regex) -> Option<Deps> {
         let temp_string = input;
         let mut required_map = FnvHashMap::default();
         let mut optional_map = FnvHashMap::default();
@@ -107,7 +118,7 @@ impl Table {
             let prod = &dep_cap["product"];
             let vers = match dep_cap.name("version") {
                 Some(ver) => ver.as_str(),
-                None => ""
+                None => "",
             };
             if option_type == "setupRequired" {
                 required_map.insert(String::from(prod), String::from(vers));
@@ -116,6 +127,9 @@ impl Table {
                 optional_map.insert(String::from(prod), String::from(vers));
             }
         }
-        Some(Deps { required: required_map, optional: optional_map })
+        Some(Deps {
+            required: required_map,
+            optional: optional_map,
+        })
     }
 }

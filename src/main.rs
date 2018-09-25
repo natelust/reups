@@ -106,16 +106,16 @@ fn main() {
     match args.subcommand() {
         ("setup", Some(m)) => {
             reups::setup_command(m, &args);
-        },
+        }
         ("prep", Some(_)) => {
             println!("{}", reups::build_prep_string());
-        },
+        }
         ("list", Some(m)) => {
             reups::list_command(m, &args);
-        },
+        }
         ("completions", Some(m)) => {
             reups::write_completions_stdout(m.value_of("shell").unwrap());
-        },
-        _ => println!("{}",args.usage()),
+        }
+        _ => println!("{}", args.usage()),
     }
 }

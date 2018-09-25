@@ -11,13 +11,13 @@
 use fnv::FnvHashMap;
 
 use std::env;
-use std::path::PathBuf;
 use std::fs;
+use std::path::PathBuf;
 
-use db;
-use table;
 use argparse;
+use db;
 use logger;
+use table;
 
 // Determine the system on which this comand is run. In eups past there used to be
 // more flavors (i.e. just linux) but these systems are almost never used and are
@@ -35,7 +35,14 @@ static SYSTEM_OS: &str = "Linux64";
 /// * env_vars: HashMap of environment variables with keys equal to the variable name, and values
 /// equal to the value of the variable.
 /// * keep: bool that controls if this should overwirte a product which already exists in the environment or not
-fn setup_table(product_version : &String, product_table: &table::Table, env_vars :& mut FnvHashMap<String, String>, keep: bool, flavor : &String, db_path: PathBuf) {
+fn setup_table(
+    product_version: &String,
+    product_table: &table::Table,
+    env_vars: &mut FnvHashMap<String, String>,
+    keep: bool,
+    flavor: &String,
+    db_path: PathBuf,
+) {
     // set the setup env var
     let mut setup_var = String::from("SETUP_");
     // set the product directory
@@ -51,19 +58,17 @@ fn setup_table(product_version : &String, product_table: &table::Table, env_vars
     // If told to keep existing products, and those products are in the env in some fashion return
     // immediately
     if keep && (env_vars.contains_key(&prod_dir_label) || prod_dir_env.is_ok()) {
-        return
+        return;
     }
 
     // add this product in to the environment map that is to be setup
-    let mut setup_string_vec = vec![product_table.name.clone(),
-                                    product_version.clone()];
+    let mut setup_string_vec = vec![product_table.name.clone(), product_version.clone()];
 
     // if there is no flavor use the system os as platform
     setup_string_vec.push("-f".to_string());
     if flavor.is_empty() {
         setup_string_vec.push(SYSTEM_OS.to_string());
-    }
-    else{
+    } else {
         setup_string_vec.push(flavor.clone());
     }
 
@@ -71,35 +76,37 @@ fn setup_table(product_version : &String, product_table: &table::Table, env_vars
     setup_string_vec.push("-Z".to_string());
     if db_path.to_str().unwrap().is_empty() {
         setup_string_vec.push("\\(none\\)".to_string());
+    } else {
+        setup_string_vec.push(db_path.to_str().unwrap().to_string().replace("ups_db", ""));
     }
-    else {
-        setup_string_vec.push(db_path.to_str().unwrap().to_string().replace("ups_db",""));
-    }
-    info!("Setting up: {:<25}Version: {}", product_table.name, product_version);
-    env_vars.insert(prod_dir_label, String::from(product_table.product_dir.to_str().unwrap()));
+    info!(
+        "Setting up: {:<25}Version: {}",
+        product_table.name, product_version
+    );
+    env_vars.insert(
+        prod_dir_label,
+        String::from(product_table.product_dir.to_str().unwrap()),
+    );
     env_vars.insert(setup_var, setup_string_vec.join("\\ "));
 
     // iterate over all environment variables, values in the supplied table
-    for (k, v) in product_table.env_var.iter(){
+    for (k, v) in product_table.env_var.iter() {
         // look up the specific env var specified in the table in the env_vars hashmap passed into
         // this function. If there is no existing variable in the hash map, check the environment
         // that was present when the program was executed. If it is found no where, return None
         // to mark there is no existing variables.
         let mut existing_var = match env_vars.get(k) {
             Some(existing) => existing.clone(),
-            None => {
-                match env::var(k) {
-                    Ok(r) => r,
-                    Err(_) => String::from("")
-                }
-            }
+            None => match env::var(k) {
+                Ok(r) => r,
+                Err(_) => String::from(""),
+            },
         };
-
 
         // if the prod_dir_env is not none, then the value of this variable should be removed from all
         // existing env var values before being set again, to prevent the variable from growing out
         // of control
-        // 
+        //
         // Variables to mark the start and end position of where the prod_dir_env value is found in
         // the value of the environment variable (k). AKA LD_LIBRARY_PATH is a long string, find
         // the location of the substring corresponding to the value of prod_dir_env
@@ -119,7 +126,7 @@ fn setup_table(product_version : &String, product_table: &table::Table, env_vars
                 for (i, character) in existing_var[tmp_start..].chars().enumerate() {
                     let glob_index = tmp_start + i;
                     if character == ':' || glob_index == existing_var.len() {
-                        end_pos = glob_index+1;
+                        end_pos = glob_index + 1;
                         break;
                     }
                 }
@@ -134,12 +141,8 @@ fn setup_table(product_version : &String, product_table: &table::Table, env_vars
         // check the action type and appropriately add the new value onto the env variable
         // under investigation in this loop
         let output_var = match v {
-            (table::EnvActionType::Prepend, var) => {
-                [var.clone(), existing_var].join(":")
-            },
-            (table::EnvActionType::Append, var) => {
-                [existing_var, var.clone()].join(":")
-            }
+            (table::EnvActionType::Prepend, var) => [var.clone(), existing_var].join(":"),
+            (table::EnvActionType::Append, var) => [existing_var, var.clone()].join(":"),
         };
 
         // Add the altered string back into the hash map of all env vars
@@ -154,10 +157,10 @@ fn setup_table(product_version : &String, product_table: &table::Table, env_vars
  * Valid input paths are the table file exactly, the path to the ups directory containing the
  * table, or the path to the directory containing the ups directory
  */
-fn get_table_path_from_input(input_path: & str) -> Option<table::Table> {
+fn get_table_path_from_input(input_path: &str) -> Option<table::Table> {
     let mut input_pathbuf = PathBuf::from(input_path);
     // check if the full path to the table file was given
-    let mut table_path : Option<PathBuf> = None;
+    let mut table_path: Option<PathBuf> = None;
     let mut prod_dir: Option<PathBuf> = None;
     if input_pathbuf.is_file() {
         if let Some(extension) = input_pathbuf.extension() {
@@ -171,11 +174,10 @@ fn get_table_path_from_input(input_path: & str) -> Option<table::Table> {
                 prod_dir = Some(tmp_prod_dir);
             }
         }
-    }
-    else if input_pathbuf.is_dir() {
+    } else if input_pathbuf.is_dir() {
         // The supplied path is a directory, it should be checked if it is an ups directory
         // or a directory containing an ups directory
-        let mut search_path : Option<PathBuf> = None;
+        let mut search_path: Option<PathBuf> = None;
         if input_pathbuf.ends_with("ups") {
             search_path = Some(input_pathbuf.clone());
         }
@@ -185,18 +187,18 @@ fn get_table_path_from_input(input_path: & str) -> Option<table::Table> {
         }
         // need to scan the search dir for the table file
         if !search_path.is_none() {
-           for entry in fs::read_dir(&search_path.unwrap()).unwrap(){
-               let entry = entry.unwrap();
-               if let Some(extension) = entry.path().extension() {
-                   if extension.to_str().unwrap() == "table"{
-                       table_path = Some(entry.path());
-                       let mut tmp_prod_dir = entry.path();
-                       tmp_prod_dir.pop();
-                       tmp_prod_dir.pop();
-                       prod_dir = Some(tmp_prod_dir);
-                   }
-               }
-           }
+            for entry in fs::read_dir(&search_path.unwrap()).unwrap() {
+                let entry = entry.unwrap();
+                if let Some(extension) = entry.path().extension() {
+                    if extension.to_str().unwrap() == "table" {
+                        table_path = Some(entry.path());
+                        let mut tmp_prod_dir = entry.path();
+                        tmp_prod_dir.pop();
+                        tmp_prod_dir.pop();
+                        prod_dir = Some(tmp_prod_dir);
+                    }
+                }
+            }
         }
     }
     if let Some(table_file) = table_path {
@@ -204,9 +206,8 @@ fn get_table_path_from_input(input_path: & str) -> Option<table::Table> {
         let prod_dir = prod_dir.unwrap().canonicalize().unwrap();
         let name = String::from(table_file.file_stem().unwrap().to_str().unwrap());
         Some(table::Table::new(name, table_file, prod_dir).unwrap())
-    }
-    else {
-        return None
+    } else {
+        return None;
     }
 }
 
@@ -219,7 +220,7 @@ fn get_table_path_from_input(input_path: & str) -> Option<table::Table> {
  * containing all the environment variables to be setup. To actually have the variables added to
  * the environment, this command must be used in combination with the rsetup shell function.
  */
-pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::ArgMatches){
+pub fn setup_command(sub_args: &argparse::ArgMatches, _main_args: &argparse::ArgMatches) {
     // Here we will process any of the global arguments in the future but for now there is
     // nothing so we do nothing but create the database. The global arguments might affect
     // construction in the future
@@ -240,7 +241,7 @@ pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::A
         }
     }
     // Always put the current tag
-    tags.push(& current);
+    tags.push(&current);
 
     let product = sub_args.value_of("product");
     // Get if the command should be run in exact or inexact mode
@@ -259,11 +260,13 @@ pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::A
             let versions = db.get_versions_from_tag(&name.to_string(), tags.clone());
             let mut version = String::from("");
             match versions.last() {
-                Some(v) => {version = v.clone();},
-                None => ()
+                Some(v) => {
+                    version = v.clone();
+                }
+                None => (),
             }
             (local_table, version)
-        },
+        }
         (None, Some(path)) => {
             // specifying a directory of table file to setup manually implies that version type
             // should be set to Inexact
@@ -276,8 +279,8 @@ pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::A
             }
             mode = table::VersionType::Inexact;
             (table, version)
-        },
-        _ => (None, String::from(""))
+        }
+        _ => (None, String::from("")),
     };
 
     // Determine if the user wants existing dependencies to be kept in the environment
@@ -288,23 +291,25 @@ pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::A
     // the product
     if let (Some(table), version) = table_option {
         // If someone specified the just flag, don't look up any dependencies
-        let mut deps :Option<db::graph::Graph> = None;
+        let mut deps: Option<db::graph::Graph> = None;
         if !sub_args.is_present("just") {
             let mut dep_graph = db::graph::Graph::new(&db);
-            dep_graph.add_table(&table,
-                                mode,
-                                db::graph::NodeType::Required,
-                                Some(&tags),
-                                true);
+            dep_graph.add_table(
+                &table,
+                mode,
+                db::graph::NodeType::Required,
+                Some(&tags),
+                true,
+            );
 
             deps = Some(dep_graph);
         }
         // create a hashmap to hold all the environment variables to set
-        let mut env_vars : FnvHashMap<String, String> = FnvHashMap::default();
+        let mut env_vars: FnvHashMap<String, String> = FnvHashMap::default();
         let flavors = db.get_flavors_from_version(&table.name, &version);
-        let flavor = match flavors.last(){
+        let flavor = match flavors.last() {
             Some(flav) => flav.clone(),
-            None => String::from("")
+            None => String::from(""),
         };
 
         // Determine the path to the database that contains this product
@@ -315,40 +320,41 @@ pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::A
         let db_path = match flavors.len() {
             1 => db_dirs[0].clone(),
             2 => db_dirs[1].clone(),
-            _ => PathBuf::from("") // Needed to satisfy rust matching
-
+            _ => PathBuf::from(""), // Needed to satisfy rust matching
         };
 
-        setup_table(&version, &table, & mut env_vars, keep, &flavor, db_path);
+        setup_table(&version, &table, &mut env_vars, keep, &flavor, db_path);
 
         // If there are dependencies, then set them up as well
         if let Some(dependencies) = deps {
             // Skip the root node, as it is what is setup
-            for node in dependencies.iter().skip(1){
+            for node in dependencies.iter().skip(1) {
                 let name = dependencies.get_name(node);
                 let versions = dependencies.product_versions(&name);
                 // right now we find the largest version from the graph and set that up, as it is
                 // easiest, but it could be wrong and this code should be thought through more.
                 // FINDME
                 let mut largest_version = versions.iter().max().unwrap().clone().clone();
-                let mut node_table_option : Option<table::Table>;
+                let mut node_table_option: Option<table::Table>;
                 if largest_version.as_str() != "" {
                     node_table_option = db.get_table_from_version(&name, &largest_version);
-                }
-                else {
+                } else {
                     node_table_option = db.get_table_from_tag(&name, tags.clone());
                     let versions = db.get_versions_from_tag(&name, tags.clone());
                     match versions.last() {
-                        Some(v) => {largest_version = v.clone();},
-                        None => ()
+                        Some(v) => {
+                            largest_version = v.clone();
+                        }
+                        None => (),
                     }
                 }
                 match (node_table_option, dependencies.is_optional(&name)) {
                     (Some(node_table), _) => {
-                        let flavors = db.get_flavors_from_version(&node_table.name, &largest_version);
+                        let flavors =
+                            db.get_flavors_from_version(&node_table.name, &largest_version);
                         let flavor = match flavors.last() {
                             Some(flav) => flav.clone(),
-                            None => String::from("")
+                            None => String::from(""),
                         };
                         // This works because there are 2 dbs, the first is always the system one
                         // the second is always the user db. and we always want to take the entry from
@@ -356,18 +362,27 @@ pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::A
                         let db_path = match flavors.len() {
                             1 => db_dirs[0].clone(),
                             2 => db_dirs[1].clone(),
-                            _ => PathBuf::from("") // Needed to satisfy rust matching
+                            _ => PathBuf::from(""), // Needed to satisfy rust matching
                         };
-                        setup_table(&largest_version, &node_table, & mut env_vars, keep, &flavor, db_path)
-                    },
+                        setup_table(
+                            &largest_version,
+                            &node_table,
+                            &mut env_vars,
+                            keep,
+                            &flavor,
+                            db_path,
+                        )
+                    }
                     (None, true) => continue,
                     (None, false) => {
-                        if env::var(String::from("SETUP_")+&name.to_uppercase()).is_ok() {
+                        if env::var(String::from("SETUP_") + &name.to_uppercase()).is_ok() {
                             warn!("Product {} could not be found in the database, resolving dependency using setup version", &name);
-                            continue
-                        }
-                        else {
-                            exit_with_message!(format!("Cannot find any acceptable table for {}", &name));
+                            continue;
+                        } else {
+                            exit_with_message!(format!(
+                                "Cannot find any acceptable table for {}",
+                                &name
+                            ));
                         }
                     }
                 }
@@ -380,9 +395,9 @@ pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::A
             return_string.push_str(" ");
         }
         println!("{}", return_string);
-    }
-    else {
-        exit_with_message!("Error, no product to setup, please specify product or path to table with -r");
+    } else {
+        exit_with_message!(
+            "Error, no product to setup, please specify product or path to table with -r"
+        );
     }
 }
-

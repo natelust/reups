@@ -28,7 +28,7 @@ pub struct DBFile {
     path: path::PathBuf,
     // Contents are a ReffCell so that there can be a mutable hashmap in an immutable
     // DBFile
-    contents: RefCell<FnvHashMap<String, String>>
+    contents: RefCell<FnvHashMap<String, String>>,
 }
 
 impl DBFile {
@@ -38,35 +38,37 @@ impl DBFile {
     pub fn new(path: path::PathBuf, preload: bool) -> DBFile {
         let db_file = DBFile {
             path: path.clone(),
-            contents: RefCell::new(FnvHashMap::default())
+            contents: RefCell::new(FnvHashMap::default()),
         };
 
         if preload {
             db_file.load_file().unwrap_or_else(|_e| {
-                exit_with_message!(
-                    format!("Problem accessing {}, could not create database",
-                            path.to_str().unwrap()));
+                exit_with_message!(format!(
+                    "Problem accessing {}, could not create database",
+                    path.to_str().unwrap()
+                ));
             });
         }
         db_file
     }
 
     /// Retrives the value of the DBFile corresponding to the supplied key
-    pub fn entry(& self, key: & String) -> Option<String> {
+    pub fn entry(&self, key: &String) -> Option<String> {
         let db_is_empty: bool;
         {
             db_is_empty = self.contents.borrow().is_empty();
         }
         if db_is_empty {
-            self.load_file().unwrap_or_else(|_e|{
-                exit_with_message!(
-                    format!("Problem accessing {}, could not create database",
-                            self.path.to_str().unwrap()));
+            self.load_file().unwrap_or_else(|_e| {
+                exit_with_message!(format!(
+                    "Problem accessing {}, could not create database",
+                    self.path.to_str().unwrap()
+                ));
             });
         }
         match self.contents.borrow().get(key) {
-           Some(value) => Some(value.clone()),
-           None => None
+            Some(value) => Some(value.clone()),
+            None => None,
         }
     }
 
@@ -74,16 +76,17 @@ impl DBFile {
     /// parses the file line by line. Any line that has an equals in it is
     /// split with the left side of the equals being the key, and the right
     /// becomes the value
-    fn load_file(& self) -> Result<(), io::Error> {
+    fn load_file(&self) -> Result<(), io::Error> {
         let contents = fs::read_to_string(&self.path)?;
 
         for line in contents.lines() {
             for (i, char) in line.char_indices() {
                 if char == '=' {
                     let key = line[0..i].trim();
-                    let value = line[i+1..].trim();
-                    self.contents.borrow_mut().insert(key.to_owned(),
-                                                      value.to_owned());
+                    let value = line[i + 1..].trim();
+                    self.contents
+                        .borrow_mut()
+                        .insert(key.to_owned(), value.to_owned());
                     break;
                 }
             }

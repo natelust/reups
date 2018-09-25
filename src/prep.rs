@@ -8,8 +8,8 @@
 ///components (at this point only rsetup) to the users environment. The
 ///resulting string must be eval-ed by the user, most commonly done with
 ///eval $(reups prep)
-pub fn build_prep_string() -> & 'static str {
-"rsetup() {
+pub fn build_prep_string() -> &'static str {
+    "rsetup() {
     args=\"$*\";
     if [[ $args = *\"-h\"* ]] || [[ $args = *\"--help\"* ]];
     then

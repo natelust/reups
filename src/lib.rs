@@ -9,28 +9,32 @@
   library.
  */
 #[doc(hidden)]
-extern crate regex;
-#[doc(hidden)]
 extern crate fnv;
 #[doc(hidden)]
-#[macro_use] extern crate clap;
+extern crate regex;
 #[doc(hidden)]
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate clap;
 #[doc(hidden)]
-#[macro_use] extern crate lazy_static;
-#[macro_use] mod cogs;
+#[macro_use]
+extern crate log;
+#[doc(hidden)]
+#[macro_use]
+extern crate lazy_static;
+#[macro_use]
+mod cogs;
 mod argparse;
+mod completions;
 mod db;
-mod setup;
 mod list;
 mod logger;
 mod prep;
-mod completions;
+mod setup;
 pub use argparse::*;
-pub use db::*;
-pub use setup::*;
-pub use list::*;
 pub use cogs::*;
+pub use completions::*;
+pub use db::*;
+pub use list::*;
 pub use logger::*;
 pub use prep::*;
-pub use completions::*;
+pub use setup::*;
