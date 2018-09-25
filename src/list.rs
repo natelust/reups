@@ -8,6 +8,14 @@ use std::env;
 use db;
 use fnv::{FnvHashMap, FnvHashSet};
 
+/**
+ * Lists info about products defined in the product database
+ *
+ * This function takes two arguments, one for command specific arguments,
+ * and one for program general options. These arguments are parsed from the
+ * command line, packaged and sent here. The arguments are defined in the
+ * argparse module.
+ */
 pub fn list_command(sub_args: & argparse::ArgMatches,
                     _main_args: & argparse::ArgMatches) {
     let mut lister = ListImpl::new(sub_args, _main_args);
@@ -15,6 +23,7 @@ pub fn list_command(sub_args: & argparse::ArgMatches,
 
 }
 
+/// This enum controls if the list command shows tags, versions, or both
 #[derive(Clone)]
 enum OnlyPrint {
     Tags,
@@ -22,9 +31,15 @@ enum OnlyPrint {
     All
 }
 
+/**
+ * The Listimpl structure is responsible for implementing the list subcomand functionality
+ * It is created with argument matche from the command line in the new method. This method
+ * prepopulates the database and some system variables. The sub command is executed with the run
+ * command.
+ */
 struct ListImpl<'a> {
     sub_args: & 'a argparse::ArgMatches<'a>,
-    main_args: & 'a argparse::ArgMatches<'a>,
+    _main_args: & 'a argparse::ArgMatches<'a>,
     output_string: String,
     current_products: FnvHashSet<(String, String)>,
     local_setups: FnvHashMap<String, String>,
@@ -33,7 +48,9 @@ struct ListImpl<'a> {
 }
 
 impl<'a> ListImpl<'a> {
-    fn new(sub_args : & 'a argparse::ArgMatches<'a>, main_args : & 'a argparse::ArgMatches<'a>) -> ListImpl<'a> {
+    /** Creates a LIstImpl struct given argument matches from the command line
+     */
+    fn new(sub_args : & 'a argparse::ArgMatches<'a>, _main_args : & 'a argparse::ArgMatches<'a>) -> ListImpl<'a> {
         // Here we will process any of the global arguments in the future but for now there is
         // nothing so we do nothing but create the database. The global arguments might affect
         // construction in the future
@@ -48,6 +65,7 @@ impl<'a> ListImpl<'a> {
             None
         }
         else {
+            // Mark the database to preload all the tag files off disk
             Some(db::DBLoadControl::Tags)
         };
         let db = db::DB::new(None, None, None, preload);
@@ -60,7 +78,7 @@ impl<'a> ListImpl<'a> {
         // create the object
         ListImpl{
             sub_args,
-            main_args,
+            _main_args,
             output_string,
             current_products,
             local_setups,
@@ -69,16 +87,24 @@ impl<'a> ListImpl<'a> {
         }
     }
 
+    /// Runs the ListImpl over arguments given on the command line, and information
+    /// gained from environment variables. Its result is the requested information is
+    /// printed out to the user in the console.
     fn run(& mut self) {
+        // If the user specified a specific product only generate output for that product
         let mut product_vec = if self.sub_args.is_present("product") {
            vec![self.sub_args.value_of("product").unwrap().to_string()] 
         }
+        // If the user specifed they want only setup products, get the list of those to display
         else if self.sub_args.is_present("setup") {
             self.current_products.iter().map(|tup| tup.0.clone()).collect()
         }
+        // If the user wants only products that have been locally setup, get the list of those
+        // products
         else if self.sub_args.is_present("local") {
             self.local_setups.keys().map(|k| k.clone()).collect()
         }
+        // Baring any input from the user, list all products found in the user and system databases
         else {
             self.db.get_all_products()
         };
@@ -94,6 +120,8 @@ impl<'a> ListImpl<'a> {
             OnlyPrint::All
         };
 
+        // Read any tags the user supplied, to restrict printing to only products
+        // with those tags
         let mut tags_vec = vec![];
         if self.sub_args.is_present("tags") {
             for t in self.sub_args.values_of("tags").unwrap() {
@@ -102,22 +130,37 @@ impl<'a> ListImpl<'a> {
             self.tags = Some(tags_vec);
         }
 
+        // Sort the products to be listed so that the results come out deterministically and in
+        // lexographic order
         product_vec.sort();
+        // Loop over all products and print the information about that product.
         for product in product_vec.iter() {
             self.print_product(product, select_printing.clone());
         }
         println!("{}", self.output_string.trim_right_matches("\n\n"));
     }
 
+    /**
+     * Given a product to print, and printing options, this function retrieves
+     * all the information required about the product from the database, formats
+     * it, and appends it to the output string.
+     */
     fn print_product(& mut self, product: &String, select_printing : OnlyPrint){
+        // If the user supplied tags, use those when determining the tags and
+        // versions to print, else grab all tags associated with the given product
         let tags = if self.tags.is_some() {
             self.tags.as_ref().unwrap().clone()
         }
         else {
             self.db.product_tags(product)
         };
+        
+        // Switch on which printing is to be done, only tags, only versons, or all
         match select_printing {
             OnlyPrint::All => {
+                // This builds an association between versions of a product and
+                // what tags point to that version. Unfortunately this must
+                // open and read a lot of files to do this.
                 let mut version_to_tags = FnvHashMap::default();
                 for tag in tags.iter() {
                     if let OnlyPrint::All = select_printing {
@@ -132,10 +175,14 @@ impl<'a> ListImpl<'a> {
                     version_to_tags.entry(local.clone()).or_insert(vec![]);
                 }
 
+                // Turn the hashmap into a vector
                 let mut version_to_tags_vec : Vec<(String, Vec<&String>)> = version_to_tags.into_iter().collect();
+                // Sort the versions vector by version
                 version_to_tags_vec.sort_by(|tup1, tup2| tup1.0.cmp(&tup2.0));
+                // Iterate over and print results
                 for (ver, tags) in version_to_tags_vec {
                     self.output_string.push_str(format!("{:25}{:>25}{:10}{}]", product, ver, "", tags.iter().fold(String::from("["), |acc, &x| {
+                        // if the tag is current, color the string
                         let name = if *x == "current" {
                             "\x1b[96mcurrent\x1b[0m".to_owned()
                         }
@@ -144,6 +191,8 @@ impl<'a> ListImpl<'a> {
                         };
                         acc + &name + ", "
                     }).trim_right_matches(", ")).as_str().trim());
+                    // Check if this product and version match any that are setup,
+                    // and if so add a colored setup string
                     if self.current_products.contains(&(product.clone(), ver)) {
                         self.output_string.push_str("    \x1b[92mSetup\x1b[0m");
                     }
@@ -189,6 +238,12 @@ impl<'a> ListImpl<'a> {
     }
 }
 
+/**
+ * Read the environment variable and find all products that have previously been setup.
+ *
+ * Returns a tuple where the first element is a hash set of (product, version) tuples. The second
+ * element is a hashmap of locally setup product names as keys, and their local setup path.
+ */
 fn find_setup_products() -> (FnvHashSet<(String, String)>, FnvHashMap<String, String>) {
     let mut product_set = FnvHashSet::default();
     let mut local_products = FnvHashMap::default();
@@ -196,10 +251,17 @@ fn find_setup_products() -> (FnvHashSet<(String, String)>, FnvHashMap<String, St
         if var.starts_with("SETUP_") {
             let value_vec: Vec<&str> = value.split(" ").collect();
             if value_vec.len() < 2 {
+                // The value corresponding to a setup product should at least have
+                // a Name and a version, if not there was an issue with that variable
                 eprintln!("Warning, problem parsing {} skipping", var);
+                continue
             }
             // the first element is the product that is setup, the second is version
             product_set.insert((value_vec[0].to_string(), value_vec[1].to_string()));
+            // Check if the product is a local setup. Track these differently, as
+            // these versions will be the setup version, but not have a corresponding
+            // version string in any database. This hashmap lets us display or append
+            // local results onto results from databases
             if value_vec[1].starts_with("LOCAL") {
                 local_products.insert(value_vec[0].to_string(), value_vec[1].to_string());
             }

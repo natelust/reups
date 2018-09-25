@@ -10,36 +10,50 @@ use std::io;
 use std::fs::File;
 use std::io::prelude::*;
 
+/**!
+  A Table object is the in memory representation of a products table file.
+ */
+
 lazy_static! {
+    // Regexes to capture information out of the text of a table file
+    // captures exact dependency trees
     static ref EXACT: Regex = Regex::new(r"[^#]\b(?P<type>setup(Optional|Required))[(](?P<product>[[:word:]]+?\b)\s+[-]j\s(?P<version>\S+?\b)[)]").unwrap();
-    // I think we want the whole last part of this to be an optional non capture group, and if
-    // there is no latter match, set it to "" for the version. This way we can deal with files that
-    // have no versions at all
+    // captures inexact dependency trees
     static ref INEXACT: Regex = Regex::new(r"[^#]\b(?P<type>setup(Optional|Required))[(](?P<product>[[:word:]]+?\b)(?:\s(?P<version>\S+?\b)\s\[)?").unwrap();
 
 
+    // Finds variables to be prepended to an environment variable
     static ref ENV_PREPEND: Regex = Regex::new(r"(envPrepend|pathPrepend)[(](?P<var>.+?)[,]\s(?P<target>.+?)[)]").unwrap();
+    // Finds variables to be appended to an environment variable
     static ref ENV_APPEND: Regex = Regex::new(r"(envAppend|pathAppend)[(](?P<var>.+?)[,]\s(?P<target>.+?)[)]").unwrap();
 }
 
+/// VersionType is an enum that differentiates between dependency trees that have
+/// explicit exact versions sepecified, or if specific versions will be determined
+/// with tags.
 #[derive(Clone)]
 pub enum VersionType {
     Exact,
     Inexact
 }
 
+/// Enum to describ the action of an environment variable, prepend or append to the
+/// env var.
 #[derive(Debug, Clone)]
 pub enum EnvActionType {
     Prepend,
     Append
 }
 
+/// Deps describes if a product is a required or optional dependency. Required
+/// dependencies will cause the application to abort if they are not present
 #[derive(Debug, Clone)]
 pub struct Deps {
     pub required: FnvHashMap<String, String>,
     pub optional: FnvHashMap<String, String>
 }
 
+/// Structure containing all the information about an on disk table file
 #[derive(Debug, Clone)]
 pub struct Table {
     pub name: String,
@@ -51,6 +65,8 @@ pub struct Table {
 }
 
 impl Table {
+    /// Creates a new Table object given the product name to assign, the path to the
+    /// table file, and the directory the product is located in
     pub fn new(name: String, path: path::PathBuf, prod_dir: path::PathBuf)
         -> Result<Table, io::Error>{
         let mut f = File::open(path.clone())?;
@@ -80,6 +96,8 @@ impl Table {
         Ok(Table {name: name, path: path, product_dir: prod_dir, exact: exact, inexact: inexact, env_var: env_var})
     }
 
+    /// Extracts the part of the table file that is related to the dependencies of the
+    /// table file
     fn extract_setup(input: &str, re: & Regex) -> Option<Deps> {
         let temp_string = input;
         let mut required_map = FnvHashMap::default();

@@ -3,6 +3,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  * Copyright Nate Lust 2018*/
 
+/**!
+    The db module is the heart of the reups program. The custom in memory
+    database it provides encodes the tag, version, table file path relations
+    between all the products reups is aware of.
+ */
+
 use fnv::FnvHashMap;
 mod dbfile;
 pub mod graph;
@@ -18,14 +24,11 @@ use std::process;
 use std::thread;
 use std::cell::RefCell;
 use std::path::PathBuf;
-
-//use std::collections::HashMap;
-
 use std::sync::mpsc;
 
-// Implementation of an database object. The outside visible database
-// object, is comprised of some number of instances of these
-// implementations
+/// Implementation of an database object. The outside visible database
+/// object, is comprised of some number of instances of these
+/// implementations
 struct DBImpl {
     directory: path::PathBuf,
     tag_to_product_info: FnvHashMap<String, FnvHashMap<String, DBFile>>,
@@ -33,17 +36,17 @@ struct DBImpl {
     product_to_tags: FnvHashMap<String, Vec<String>>
 }
 
-// Data structure to hold state related to iterating over a db object.
-// This iteration is used to loop over all the instance of DBImpls
-// contained in the database, which at this point includes the main
-// and user dbs
+/// Data structure to hold state related to iterating over a db object.
+/// This iteration is used to loop over all the instance of DBImpls
+/// contained in the database, which at this point includes the main
+/// and user dbs
 struct DBIter<'a> {
     inner: & 'a DB,
     pos: usize
 }
 
-// Implementing the iterator type trait for DBIter so that the stuct
-// can be used in places where iteration happens
+/// Implementing the iterator type trait for DBIter so that the stuct
+/// can be used in places where iteration happens
 impl<'a> Iterator for DBIter<'a> {
     type Item = & 'a DBImpl;
 
@@ -74,6 +77,7 @@ impl<'a> Iterator for DBIter<'a> {
     }
 }
 
+/// Enum to describe what types of `DBFile`s should be loaded at DB creation time.
 #[derive(Clone)]
 pub enum DBLoadControl {
     Versions,
@@ -81,7 +85,9 @@ pub enum DBLoadControl {
     All
 }
 
-// User visible database
+/// Database object that library consumers interact though. This DB encodes all the
+/// relations between products, versions, tags, and tables that are encoded in the
+/// filesystem besed database.
 pub struct DB {
     system_db: DBImpl,
     user_db: Option<DBImpl>,
@@ -89,6 +95,7 @@ pub struct DB {
     cache: RefCell<FnvHashMap<(String, String), table::Table>>
 }
 
+/// Describes how the db will be shown when written in a formatted
 impl fmt::Debug for DB {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Database at {:?}\n", self.system_db.directory)?;
@@ -100,6 +107,11 @@ impl fmt::Debug for DB {
 }
 
 impl DB {
+    /// Creates a new DB object. Optionally takes the path to a system database, a user database,
+    /// and where the products themselves are located. Another optional argument is a
+    /// DBLoadControl, which specifies which products are to be preloaded from disk at database
+    /// creation time. Set the option to None if no products are to be loaded
+    /// and
     pub fn new(db_path: Option<& str>, user_tag_root: Option<& str>, def_stack_root: Option<& str>, preload : Option<DBLoadControl>) -> DB {
         // Check to see if a path was passed into the db builder, else get the
         // eups system variable
@@ -158,6 +170,7 @@ impl DB {
 
     }
 
+    /// Returns a vector containing the names of all the products that are known to the database.
     pub fn get_all_products(& self) -> Vec<String> {
         // iterate over all dbs, getting a vector of keys of products, and append them to one
         // overall vector
@@ -168,6 +181,7 @@ impl DB {
         })
     }
 
+    /// Returns the paths to the system and (optionally if one exists) user databases
     pub fn get_db_directories(& self) -> Vec<PathBuf> {
         let mut paths = Vec::new();
         for db in self.iter() {
@@ -176,6 +190,7 @@ impl DB {
         paths
     }
 
+    /// Produces a vector of all the versions of the specified product
     pub fn product_versions(& self, product: & String) -> Vec<String>{
         let mut product_versions = vec![];
         for db in self.iter() {
@@ -186,6 +201,7 @@ impl DB {
         product_versions
     }
 
+    /// Outputs a vector of all tags corresponding to the specified product
     pub fn product_tags(& self, product: & String) -> Vec<String> {
         let mut tags_vec = vec![];
         for db in self.iter() {
@@ -196,6 +212,7 @@ impl DB {
         tags_vec
     }
 
+    /// Looks up the table corresponding to the product, version combination specified.
     pub fn get_table_from_version(& self, product: & String, version: & String) -> Option<table::Table> {
         // try getting from the db cache
         // block this so that the reference to cache goes out of scope once we are done
@@ -243,6 +260,7 @@ impl DB {
         }
     }
 
+    /// Lists the flavors of a product corresponding to a specified product and version
     pub fn get_flavors_from_version(& self, product : & String, version : & String) -> Vec<String> {
         let mut flavors = Vec::new();
         for db in self.iter() {
@@ -255,6 +273,8 @@ impl DB {
         }
         flavors
     }
+
+    /// Looks up all the versions which correspond to specified prodcut and tag
     pub fn get_versions_from_tag(& self, product: & String, tag: Vec<& String>) -> Vec<String> {
          // store versions found in the main db and the user db
         let mut versions_vec: Vec<String> = vec![];
@@ -274,6 +294,7 @@ impl DB {
         versions_vec
     }
 
+    /// Looks up a table file given a product and tag
     pub fn get_table_from_tag(& self, product: & String, tag: Vec<& String>) -> Option<table::Table>{
         let versions_vec = self.get_versions_from_tag(product, tag);
         // use the last element, as this will select the user tag if one is present else
@@ -298,9 +319,9 @@ impl DB {
         }
     }
 
-    //pub fn make_dep_graph(product: String) -> graph::Graph {
-    //}
 
+    /// Creates an iterator over the database object. This will loop over the system
+    /// and user databases
     fn iter<'a>(& 'a self) -> DBIter<'a> {
         DBIter {
             inner: self,
@@ -308,6 +329,7 @@ impl DB {
         }
     }
 
+    /// Look up if a given product exists in the database
     pub fn has_product(& self, product: & String) -> bool {
         // iterate over the global and user db
         for db in self.iter() {
@@ -323,6 +345,11 @@ impl DB {
 }
 
 
+/// This function builds all the components which go into the creation of a database.
+/// The functionality was sufficiently complex that it was factored out of new for the
+/// sake of readability. The function makes heavy use of system threads to create worker
+/// pools to speed up the process of reading all the database information off disk, as
+/// io is inherently an asynchronous process.
 fn build_db(eups_path: PathBuf, load_options : Option<DBLoadControl>) -> (path::PathBuf,
                                        FnvHashMap<String, FnvHashMap<String, DBFile>>,
                                        FnvHashMap<String, FnvHashMap<String, DBFile>>,

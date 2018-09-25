@@ -13,12 +13,20 @@ use db::table;
 use std::fmt;
 use db::graph::petgraph::visit::Walker;
 
+/**!
+  The module graph contains all the machinery for turning products described
+  by table files into a relational graph of those products.
+ */
+
+/// Describes if a node in the graph represents an optional dependency, or
+/// a required dependency
 #[derive(Clone)]
 pub enum NodeType {
     Required,
     Optional
 }
 
+/// A string representation of a node in the graph
 impl fmt::Debug for NodeType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -28,6 +36,8 @@ impl fmt::Debug for NodeType {
     }
 }
 
+/// Graph is a structure that holds the relational information between products, and
+/// has methods to add products to the relational graph
 #[derive(Debug)]
 pub struct Graph<'a> {
     _graph: petgraph::Graph<NodeType, String>,
@@ -38,6 +48,7 @@ pub struct Graph<'a> {
 }
 
 impl<'a> Graph<'a> {
+    /// Created a new graph that will be associated with the specified database
     pub fn new(db: & 'a DB) ->  Graph {
         Graph{ _graph: petgraph::Graph::<NodeType, String>::new(),
                _name_map: FnvHashMap::default(),
@@ -45,10 +56,12 @@ impl<'a> Graph<'a> {
                _db: db,
                _processed: HashSet::new()}
     }
+    /// Resolves the index of a graph node into a string of the product name at that node
     pub fn get_name(& self, number: petgraph::graph::NodeIndex<petgraph::graph::DefaultIx>) -> String {
         return self._index_map[&number].clone()
     }
 
+    /// Add a product to the graph, or update the node type of that product if it already exists
     pub fn add_or_update_product(&mut self, name: String, node_type: NodeType) {
         match self.has_product(&name) {
             true => {
@@ -66,10 +79,14 @@ impl<'a> Graph<'a> {
         }
     }
 
+    /// Checks if the graph contains a given product
     pub fn has_product(& self, name: &String) -> bool {
         self._name_map.contains_key(name)
     }
 
+    /// Returns all the different versions of a product that the graph describes.
+    /// I.E. different nodes in the graph may point to a given product as a dependency
+    /// with different version of that dependency listed as a requirement
     pub fn product_versions(& self, name: &String) -> Vec<&String> {
         let mut products = Vec::new();
         let index = self._name_map[name];
@@ -80,6 +97,7 @@ impl<'a> Graph<'a> {
         products
     }
 
+    /// Determines if a given node is listed as an optional node in the graph
     pub fn is_optional(& self, name : &String) -> bool {
         let node = self._name_map[name];
         let weight = self._graph.node_weight(node);
@@ -89,6 +107,9 @@ impl<'a> Graph<'a> {
         }
     }
 
+    /// Connects two products (nodes) in the graph together with a specific version. Note that this
+    /// is a directional graph so the version requirement will point from the source to the target
+    /// node
     pub fn connect_products(& mut self, source: &String, target: &String, version: String) -> Result<(), &str> {
         if !self.has_product(source) {
             return Err("The specified source is not in the graph");
@@ -102,6 +123,8 @@ impl<'a> Graph<'a> {
         Ok(())
     }
 
+    /// Add a product to the graph specified by a given tag. This tag is looked up in the database
+    /// associated with this graph and resolved into a table file. Optionally add in the dependencies from the table file if recurse is true
     pub fn add_product_by_tag(& mut self,  product: String,
                               tag: & Vec<& String>,
                               version_type: table::VersionType,
@@ -115,6 +138,9 @@ impl<'a> Graph<'a> {
         }
     }
     
+    /// Add a product to the graph specified by a given version. This version is looked up in the database
+    /// associated with this graph and resolved into a table file. Optionally add in the
+    /// dependencies from the table file if recurse is true
     pub fn add_product_by_version(& mut self, product: String, version: String,
                                   version_type: table::VersionType, node_type: NodeType, recurse: bool){
         if !self._processed.contains(&product){
@@ -125,6 +151,8 @@ impl<'a> Graph<'a> {
         }
     }
 
+    /// Add a specific table into the graph of products. Optionally add in the
+    /// dependencies from the table file if recurse is true
     pub fn add_table(& mut self,  table: & table::Table,
                      version_type: table::VersionType,
                      node_type: NodeType,
@@ -170,6 +198,7 @@ impl<'a> Graph<'a> {
         self._processed.insert(top.clone());
     }
 
+    /// Iterates though the nodes of the graph
     pub fn iter(& self) -> petgraph::visit::WalkerIter<petgraph::visit::Topo<<petgraph::Graph<NodeType, String> as petgraph::visit::GraphBase>::NodeId, <petgraph::Graph<NodeType, String> as petgraph::visit::Visitable>::Map>, &petgraph::Graph<NodeType, String>>{
         let topo = petgraph::visit::Topo::new(&self._graph);
         return topo.iter(&self._graph)

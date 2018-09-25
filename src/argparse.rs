@@ -3,9 +3,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  * Copyright Nate Lust 2018*/
 
+#[doc(no_inline)]
 pub use clap::{ArgMatches};
 use clap::{Arg,App, SubCommand};
 
+/**
+ * Builds and returns the sub command struct, containing all the options for the setup command
+*/
 pub fn build_setup<'a, 'b>() -> App<'a, 'b> {
     return SubCommand::with_name("setup")
                           .arg(Arg::with_name("product")
@@ -42,6 +46,9 @@ pub fn build_setup<'a, 'b>() -> App<'a, 'b> {
                                 .help("Sets the level of verbosity, multiple occurances increases verbosity"));
 }
 
+/**
+ * Builds and returns the sub command struct, containing all the options for the list command
+ */
 fn build_list<'a, 'b>() -> App<'a, 'b> {
     return SubCommand::with_name("list")
                           .arg(Arg::with_name("product")
@@ -74,6 +81,9 @@ fn build_list<'a, 'b>() -> App<'a, 'b> {
                                .conflicts_with_all(&["product", "setup"]));
 }
 
+/**
+ * Builds and returns the sub command struct, containing all the options for the completions command.
+ */
 fn build_completions<'a, 'b>() -> App<'a, 'b> {
     return SubCommand::with_name("completions")
                           .about("Creates auto completeion scripts for given shell")
@@ -83,10 +93,19 @@ fn build_completions<'a, 'b>() -> App<'a, 'b> {
                                .help("Shell to create completions for"));
 }
 
+/**
+ * Builds and returns the sub command struct, containing all the options for the prep command.
+ *
+ * Currently this is basically an empty command just to create the setup option, but in the future
+ * this command may take optional arguments such as a configuration file to use in preping.
+ */
 fn build_prep<'a, 'b>() -> App<'a, 'b> {
     return SubCommand::with_name("prep");
 }
 
+/**
+ * This function is responsible for creating all the possible command line options and arguments for the main program, and each of the sub commands.
+ */
 pub fn build_cli() -> App<'static, 'static> {
     App::new("Rust Eups")
         .author("Nate Lust")
@@ -98,6 +117,10 @@ pub fn build_cli() -> App<'static, 'static> {
         .subcommand(build_completions())
 }
 
+/**
+ * This is the main argument parser for the reups program. It parses the arguments from the command
+ * line into a `ArgMatches` object containing all the supplied options.
+ */
 pub fn parse_args<'a> () -> ArgMatches<'a> {
     let matches = build_cli().get_matches();
     return matches;

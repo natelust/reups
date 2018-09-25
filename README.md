@@ -40,7 +40,7 @@ are available for both linux (distro agnostic), and MacOs (10.7 and higher).
 In it's current state reups bootstraps itself off an eups installation. As such eups must be setup prior to
 using reups. After eups is setup, reups should be set up by evaulating the results of the builtin prep command, as can be seen in the following example.
 
-__Note__ As of version 0.1.0, reups only implements the setup functionality of eups, with a command called `rsetup`,
+__Note__ As of version 0.2.0, reups only implements the setup and list functionality of eups. Setting up products is done with a command called `rsetup`,
 chosen to not interfere with the default `setup` command.
 
 #### Example

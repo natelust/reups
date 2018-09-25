@@ -3,6 +3,11 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  * Copyright Nate Lust 2018*/
 
+/*!
+  Setup is the subcommand responsible for adding products to a users
+  environment based on the options provided.
+ */
+
 use fnv::FnvHashMap;
 
 use std::env;
@@ -14,11 +19,22 @@ use table;
 use argparse;
 use logger;
 
+// Determine the system on which this comand is run. In eups past there used to be
+// more flavors (i.e. just linux) but these systems are almost never used and are
+// dropped from consideration in reups.
 #[cfg(target_os = "macos")]
 static SYSTEM_OS: &str = "Darwin64";
 #[cfg(target_os = "linux")]
 static SYSTEM_OS: &str = "Linux64";
 
+/// Given a product's version and table file, this function creates all the appropriate
+/// environment variable entries given the supplied options.
+///
+/// * product_version: The version of the product being setup
+/// * product_table: The table file object for the product being setup
+/// * env_vars: HashMap of environment variables with keys equal to the variable name, and values
+/// equal to the value of the variable.
+/// * keep: bool that controls if this should overwirte a product which already exists in the environment or not
 fn setup_table(product_version : &String, product_table: &table::Table, env_vars :& mut FnvHashMap<String, String>, keep: bool, flavor : &String, db_path: PathBuf) {
     // set the setup env var
     let mut setup_var = String::from("SETUP_");
@@ -131,6 +147,13 @@ fn setup_table(product_version : &String, product_table: &table::Table, env_vars
     }
 }
 
+/**
+ * If tables are specified as a filesystem path, this function attempts to load and return the
+ * table file.
+ *
+ * Valid input paths are the table file exactly, the path to the ups directory containing the
+ * table, or the path to the directory containing the ups directory
+ */
 fn get_table_path_from_input(input_path: & str) -> Option<table::Table> {
     let mut input_pathbuf = PathBuf::from(input_path);
     // check if the full path to the table file was given
@@ -187,6 +210,15 @@ fn get_table_path_from_input(input_path: & str) -> Option<table::Table> {
     }
 }
 
+/**
+ * This function takes in arguments parsed from the command line, parses them for products to setup
+ * and options to use during the setup, and sets up the specified product in the
+ * environment.
+ *
+ * Because of the way environments work, this function itself actually only returns a string
+ * containing all the environment variables to be setup. To actually have the variables added to
+ * the environment, this command must be used in combination with the rsetup shell function.
+ */
 pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::ArgMatches){
     // Here we will process any of the global arguments in the future but for now there is
     // nothing so we do nothing but create the database. The global arguments might affect
@@ -217,6 +249,7 @@ pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::A
         mode = table::VersionType::Inexact;
     }
 
+    // Match to determine if a product or relative path was given by the user
     let table_option = match (product, sub_args.value_of("relative")) {
         (Some(name), _) => {
             if !db.has_product(&name.to_string()) {
@@ -247,8 +280,12 @@ pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::A
         _ => (None, String::from(""))
     };
 
+    // Determine if the user wants existing dependencies to be kept in the environment
+    // or replaced
     let keep = sub_args.is_present("keep");
 
+    // If there is a valid table and version found, determine dependencies and setup
+    // the product
     if let (Some(table), version) = table_option {
         // If someone specified the just flag, don't look up any dependencies
         let mut deps :Option<db::graph::Graph> = None;
@@ -270,6 +307,7 @@ pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::A
             None => String::from("")
         };
 
+        // Determine the path to the database that contains this product
         let db_dirs = db.get_db_directories();
         // This works because there are 2 dbs, the first is always the system one
         // the second is always the user db. and we always want to take the entry from
@@ -283,6 +321,7 @@ pub fn setup_command(sub_args: & argparse::ArgMatches, _main_args: & argparse::A
 
         setup_table(&version, &table, & mut env_vars, keep, &flavor, db_path);
 
+        // If there are dependencies, then set them up as well
         if let Some(dependencies) = deps {
             // Skip the root node, as it is what is setup
             for node in dependencies.iter().skip(1){

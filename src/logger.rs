@@ -8,12 +8,17 @@ use log;
 use std::boxed::Box;
 use argparse;
 
+/// Structure which is responsible processing input from the std log
+/// api. It's members are the highest log level to output, and if
+/// the output should be sent to stdandard error instead of standard out.
 pub struct Logger {
     log_level: log::LevelFilter,
     stderr: bool
 }
 
 impl Logger {
+    /// Creates a new logger object. Arguments are the maximum level to log,
+    /// and if the output should go to standard out or standard error.
     pub fn new(log_level: log::LevelFilter, stderr: bool) -> Box<Logger>{
         Box::new(Logger {
             log_level,
@@ -45,6 +50,9 @@ impl log::Log for Logger {
     fn flush(&self) {}
 }
 
+/// Builds and initializes a logging object with options from the command line
+/// and the stderr boolean which is governed by the context of the subcommand
+/// that initiates the logger.
 pub fn build_logger(args: & argparse::ArgMatches, stderr: bool) {
     let level = match args.occurrences_of("verbose") {
         0 => log::LevelFilter::Warn,

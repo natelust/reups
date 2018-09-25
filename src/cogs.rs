@@ -3,9 +3,22 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  * Copyright Nate Lust 2018*/
 
+/*!
+ The `cogs` module contains miscellaneous components used to interact with
+ reups.
+
+ These functions are defined here, to make them available in one central
+ location within the `reups_lib` library. The main library re-exports this
+ module, so end users of `reups_lib` should see all functions exposed there.
+ */
+
 use std::env;
 use std::path::PathBuf;
 
+/** Macro used to print an error message to the console and terminate execution
+ *
+ * This may be replaced in the future with the use of a logging system.
+ */
 macro_rules! exit_with_message {
     ($message:expr) => {
         use std::process::exit;
@@ -14,6 +27,11 @@ macro_rules! exit_with_message {
     }
 }
 
+/// Returns the eups system path as determined from the EUPS_PATH environment variable.
+///
+/// If EUPS_PATH contains more than one database path, they should be seperated by a pipe
+/// character. This function will return the first database path, as it should be the most
+/// recently added to the environment.
 pub fn get_eups_path_from_env() -> PathBuf {
     let env_var = env::var("EUPS_PATH").unwrap_or_else(|e|{
         exit_with_message!(format!("Problem loading eups path: {}", e));
@@ -37,6 +55,7 @@ pub fn get_eups_path_from_env() -> PathBuf {
     }
 }
 
+/// Returns the path to a user database, defined in users home directory, if one is present.
 pub fn get_user_path_from_home() -> Option<PathBuf> {
     let user_home= env::home_dir();
     let mut user_path = user_home?;
