@@ -323,7 +323,9 @@ pub fn setup_command(sub_args: &argparse::ArgMatches, _main_args: &argparse::Arg
             _ => PathBuf::from(""), // Needed to satisfy rust matching
         };
 
-        setup_table(&version, &table, &mut env_vars, keep, &flavor, db_path);
+        // Keep should always be false for the first product to setup, as this is the
+        // directory the user specified, so clearly they want to set it up.
+        setup_table(&version, &table, &mut env_vars, false, &flavor, db_path);
 
         // If there are dependencies, then set them up as well
         if let Some(dependencies) = deps {
