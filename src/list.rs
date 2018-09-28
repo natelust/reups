@@ -163,11 +163,14 @@ impl<'a> ListImpl<'a> {
                 // what tags point to that version. Unfortunately this must
                 // open and read a lot of files to do this.
                 let mut version_to_tags = FnvHashMap::default();
-                for tag in tags.iter() {
-                    if let OnlyPrint::All = select_printing {
-                        let versions = self.db.get_versions_from_tag(product, vec![tag]);
-                        for v in versions {
-                            version_to_tags.entry(v).or_insert(vec![]).push(tag);
+                // dont accumulate versions if only locals are to be listed
+                if !self.sub_args.is_present("local") {
+                    for tag in tags.iter() {
+                        if let OnlyPrint::All = select_printing {
+                            let versions = self.db.get_versions_from_tag(product, vec![tag]);
+                            for v in versions {
+                                version_to_tags.entry(v).or_insert(vec![]).push(tag);
+                            }
                         }
                     }
                 }
@@ -233,7 +236,11 @@ impl<'a> ListImpl<'a> {
                 self.output_string.push_str("\n\n");
             }
             OnlyPrint::Versions => {
-                let mut versions = self.db.product_versions(product);
+                let mut versions = if !self.sub_args.is_present("local") {
+                    self.db.product_versions(product)
+                } else {
+                    vec![]
+                };
                 if let Some(local) = self.local_setups.get(product) {
                     versions.push(local.clone());
                 }
