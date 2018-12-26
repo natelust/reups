@@ -17,5 +17,14 @@ pub fn build_prep_string() -> &'static str {
     else
         eval $(reups setup $args);
     fi;
-}"
+};
+
+rrestore() {
+eval $(reups env restore $args);
+};
+
+rsave() {
+reups env save $args;
+};
+"
 }

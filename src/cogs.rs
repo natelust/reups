@@ -4,13 +4,13 @@
  * Copyright Nate Lust 2018*/
 
 /*!
- The `cogs` module contains miscellaneous components used to interact with
- reups.
+The `cogs` module contains miscellaneous components used to interact with
+reups.
 
- These functions are defined here, to make them available in one central
- location within the `reups_lib` library. The main library re-exports this
- module, so end users of `reups_lib` should see all functions exposed there.
- */
+These functions are defined here, to make them available in one central
+location within the `reups_lib` library. The main library re-exports this
+module, so end users of `reups_lib` should see all functions exposed there.
+*/
 
 use std::env;
 use std::path::PathBuf;

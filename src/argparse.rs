@@ -106,6 +106,33 @@ fn build_completions<'a, 'b>() -> App<'a, 'b> {
 }
 
 /**
+ * Builds the completetions for the sub command env. This allows the reups commands run in one
+ * shell to be recored and replayed in another shell
+ */
+fn build_env<'a, 'b>() -> App<'a, 'b> {
+    return SubCommand::with_name("env")
+        .about("Save or restore an existing reups environment")
+        .arg(
+            Arg::with_name("command")
+                .required(true)
+                .possible_values(&["save", "restore", "delete", "list"])
+                .help("Action to take for a given environment, to restore you most likely want to use the rrestore shell function"),
+        )
+        .arg(
+            Arg::with_name("name")
+                .required(false)
+                .help("Optional name to save/restore"),
+        )
+        .arg(
+            Arg::with_name("verbose")
+                .short("v")
+                .long("verbose")
+                .multiple(true)
+                .help("Sets the level of verbosity, multiple occurances increases verbosity"),
+        );
+}
+
+/**
  * Builds and returns the sub command struct, containing all the options for the prep command.
  *
  * Currently this is basically an empty command just to create the setup option, but in the future
@@ -127,6 +154,7 @@ pub fn build_cli() -> App<'static, 'static> {
         .subcommand(build_prep())
         .subcommand(build_list())
         .subcommand(build_completions())
+        .subcommand(build_env())
 }
 
 /**

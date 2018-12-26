@@ -55,7 +55,7 @@ Details of these commands are as follows:
 **Prep**
 
 This command is used to setup reups, and is responsible for assembling all the shell functionality such as
-providing the `rsetup` tool. This command is most commonly used as `eval $(reups prep).
+providing the `rsetup`, `rrestore`, and `rsave` tools. This command is most commonly used as `eval $(reups prep).
 
 **Completions**
 
@@ -84,16 +84,39 @@ The setup command (and thus rsetup) support the following options:
 * -k --keep: Keep any products already setup, dont replace them when reruning a new command
 * -t --tag: Use this tag when setting up products, multiple are allowed and are evaluated left to right
 * -E --inexact: Use only tags in deciding what to setup, ignore any versions declared in table files
-* <product>: Positional argument which is the name of the product to setup, conflicts with relative option
+* \<product\>: Positional argument which is the name of the product to setup, conflicts with relative option
 
 **List**
+
+Lists various properties about managed packages, and the current environment
 
 * -s --setup: Only list setup products
 * -t --tags: Only list specified tag(s). Multiple instances are ok
 * --onlyTags: Only list products and tags on output. This is faster than listing products, tags, and versions, conflicts with only Versions
 * --onlyVers: Only list product and versions on output. This is faster than listing products, tags, and versions conflicts with onlyTags
 * -l --local Only list products that have been setup with the -r option. Conflicts with setup or a product as an argument.
-* <product>: Name of product to list
+* \<product>: Name of product to list
+
+**Env**
+
+Env is a subcommand for saving and restoring a users environment as it has been setup. The idea behind this
+module is that a user may issue several different calls to rsetup (reups setup) to configure the exact
+packages active. The user can then save this setup to restore into a different shell. This is not meant as a
+complete replacement for tagging product directories, but as a sort of save your work buffer for setups that
+are not intended to live for a long time. As a caveat this also replays the commands issued exactly, so if
+anything changed (such as the current tag changing) commands will not necessarily recreate the exact
+environment at the time of saving, but will reconstruct an environment as if the current (r)eups environment
+was the environment when the commands were first issued.
+
+Users will most often interact with this subcommand with the supplied `rsave` and `rrestore` shell functions supplied by `reups prep`. `rrestore`
+must be used to restore an environment, as shell environment variables are being set or manipulated.
+`rsave` is exactly identical to typing out `reups env save` and is supplied as a convienence to the user.
+
+* -v --verbose Sets the level of verbosity, multiple occurances increases verbosity
+* \<action\>: Required, one of save, restore, delete, list
+* \<name\>: Optional, a name to use when saving or restoring
+
+
 **/
 
 extern crate reups_lib;
@@ -115,6 +138,9 @@ fn main() {
         }
         ("completions", Some(m)) => {
             reups::write_completions_stdout(m.value_of("shell").unwrap());
+        }
+        ("env", Some(m)) => {
+            reups::env_command(m, &args);
         }
         _ => println!("{}", args.usage()),
     }

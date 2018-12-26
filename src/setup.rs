@@ -4,9 +4,9 @@
  * Copyright Nate Lust 2018*/
 
 /*!
-  Setup is the subcommand responsible for adding products to a users
-  environment based on the options provided.
- */
+ Setup is the subcommand responsible for adding products to a users
+ environment based on the options provided.
+*/
 
 use fnv::FnvHashMap;
 
@@ -211,6 +211,59 @@ fn get_table_path_from_input(input_path: &str) -> Option<table::Table> {
     }
 }
 
+/** Function to ensure a supplied path is not a relative path
+ *
+ * * input - A string that represents a path to be normalized
+ *
+ * Returns a normalized path, or an error if the supplied input does not correspond to a file
+ * system path, or there was some issue interacting with the file system.
+ **/
+fn normalize_path(input: String) -> Result<String, std::io::Error> {
+    let tmp_path = PathBuf::from(input).canonicalize()?;
+    let err = std::io::Error::new(std::io::ErrorKind::Other, "Problem normalizing Path");
+    let tmp_string = tmp_path.to_str().ok_or(err)?;
+    Ok(String::from(tmp_string))
+}
+
+/**
+ * Gets the arguments used to invoke this subcommand from the command line, ensures all paths are
+ * normalized, and formats these arguments into a single string
+ **/
+fn get_command_string() -> String {
+    // marker to indicate the next argument is a path that should be normalized
+    let mut marker = false;
+    // String to accumulate the input arguments into
+    let mut command_arg = String::new();
+    // Make the switches to check a vector, so future switches can be added easily
+    // This represents a switch where the following argument will be a path to be
+    // normalized
+    let switches = vec!["-r"];
+    for arg in env::args() {
+        let next_string: String = match marker {
+            true => {
+                // if the marker is set, normalize the current arg and return it, setting
+                // marker to false
+                marker = false;
+                normalize_path(arg).unwrap()
+            }
+            false => {
+                // The marker is not set, check if the current argument is a desired
+                // switch and if so set marker so the next argument will be normalzied
+                if switches.contains(&arg.as_str()) {
+                    marker = true;
+                }
+                // return argument
+                arg
+            }
+        };
+        // push the current argument onto our accumulated string
+        command_arg.push_str(format!("{} ", next_string.as_str()).as_str());
+    }
+    // pop off the trailing white space
+    command_arg.pop();
+    command_arg
+}
+
 /**
  * This function takes in arguments parsed from the command line, parses them for products to setup
  * and options to use during the setup, and sets up the specified product in the
@@ -240,6 +293,7 @@ pub fn setup_command(sub_args: &argparse::ArgMatches, _main_args: &argparse::Arg
             tags.push(t);
         }
     }
+    info!("Using tags: {:?}", tags);
     // Always put the current tag
     tags.push(&current);
 
@@ -390,6 +444,20 @@ pub fn setup_command(sub_args: &argparse::ArgMatches, _main_args: &argparse::Arg
                 }
             }
         }
+
+        // Add or update env var for reups history
+        let current_reups_command = get_command_string();
+        // If there is an existing reups history environment variable append to it
+        // separating with a pipe character. else return a new string for the env
+        // var. Both make sure the string to be set as an environment variable are
+        // quoted so that all spaces are preserved
+        let reups_history_string = match env::var("REUPS_HISTORY") {
+            Ok(existing) => format!("\"{}|{}\"", existing, current_reups_command),
+            _ => format!("\"{}\"", current_reups_command),
+        };
+        let reups_history_key = String::from("REUPS_HISTORY");
+        // insert into the in memory map of environment variables to values
+        env_vars.insert(reups_history_key, reups_history_string);
         // Process all the environment variables into a string to return
         let mut return_string = String::from("export ");
         for (k, v) in env_vars {
