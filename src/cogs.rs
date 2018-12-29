@@ -12,6 +12,7 @@ location within the `reups_lib` library. The main library re-exports this
 module, so end users of `reups_lib` should see all functions exposed there.
 */
 
+use dirs;
 use std::env;
 use std::path::PathBuf;
 
@@ -56,7 +57,7 @@ pub fn get_eups_path_from_env() -> PathBuf {
 
 /// Returns the path to a user database, defined in users home directory, if one is present.
 pub fn get_user_path_from_home() -> Option<PathBuf> {
-    let user_home = env::home_dir();
+    let user_home = dirs::home_dir();
     let mut user_path = user_home?;
     user_path.push(".eups/ups_db");
     if user_path.is_dir() {

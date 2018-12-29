@@ -21,6 +21,7 @@ extern crate log;
 #[doc(hidden)]
 #[macro_use]
 extern crate lazy_static;
+extern crate dirs;
 extern crate preferences;
 #[macro_use]
 mod cogs;
