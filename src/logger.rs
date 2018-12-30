@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
 * Copyright Nate Lust 2018*/
 
-use argparse;
+use crate::argparse;
 use log;
 use std::boxed::Box;
 

@@ -15,8 +15,8 @@
  * the environment when the commands were first issued.
  *
  **/
-use argparse;
-use logger;
+use crate::argparse;
+use crate::logger;
 use preferences;
 use preferences::Preferences;
 use std::env as stdEnv;
@@ -98,12 +98,12 @@ impl<'a> EnvCommandImpl<'a> {
         // Check that there was an existing environment, otherwise create one.
         let saved_envs = {
             if saved_envs.is_ok() {
-                debug!("saved_envs loaded existing env");
+                crate::debug!("saved_envs loaded existing env");
                 saved_envs.unwrap()
             } else {
                 // there is no existing preferences
-                debug!("Existing env was not loaded, create and use new env store");
-                warn!("No existing env store could be found create a new one? (y/N)");
+                crate::debug!("Existing env was not loaded, create and use new env store");
+                crate::warn!("No existing env store could be found create a new one? (y/N)");
                 let mut s = String::new();
                 stdin()
                     .read_line(&mut s)
@@ -115,7 +115,7 @@ impl<'a> EnvCommandImpl<'a> {
                     s.pop();
                 }
                 if s == "y" || s == "Y" {
-                    warn!("Creating new env store");
+                    crate::warn!("Creating new env store");
                     preferences::PreferencesMap::<Vec<String>>::new()
                 } else {
                     exit_with_message!("No env store found or created, exiting");
@@ -213,7 +213,7 @@ impl<'a> EnvCommandImpl<'a> {
         println!("Environments Found:");
         for (k, v) in &self.saved_envs {
             println!("{}", k);
-            info!("{:?}", v);
+            crate::info!("{:?}", v);
         }
     }
 }

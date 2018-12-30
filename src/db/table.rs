@@ -4,6 +4,7 @@
  * Copyright Nate Lust 2018*/
 
 use fnv::FnvHashMap;
+use lazy_static;
 use regex::Regex;
 use std::fs::File;
 use std::io;
@@ -11,10 +12,10 @@ use std::io::prelude::*;
 use std::path;
 
 /**!
-  A Table object is the in memory representation of a products table file.
- */
+ A Table object is the in memory representation of a products table file.
+*/
 
-lazy_static! {
+lazy_static::lazy_static! {
     // Regexes to capture information out of the text of a table file
     // captures exact dependency trees
     static ref EXACT: Regex = Regex::new(r"[^#]\b(?P<type>setup(Optional|Required))[(](?P<product>[[:word:]]+?\b)\s+[-]j\s(?P<version>\S+?\b)[)]").unwrap();

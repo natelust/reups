@@ -149,7 +149,7 @@ pub fn build_cli() -> App<'static, 'static> {
     App::new("Rust Eups")
         .author("Nate Lust")
         .about("Dynamic environment management")
-        .version(crate_version!())
+        .version(clap::crate_version!())
         .subcommand(build_setup())
         .subcommand(build_prep())
         .subcommand(build_list())

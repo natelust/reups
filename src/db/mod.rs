@@ -4,17 +4,17 @@
  * Copyright Nate Lust 2018*/
 
 /**!
-    The db module is the heart of the reups program. The custom in memory
-    database it provides encodes the tag, version, table file path relations
-    between all the products reups is aware of.
- */
+   The db module is the heart of the reups program. The custom in memory
+   database it provides encodes the tag, version, table file path relations
+   between all the products reups is aware of.
+*/
 use fnv::FnvHashMap;
 mod dbfile;
 pub mod graph;
 pub mod table;
 
 use self::dbfile::DBFile;
-use cogs;
+use crate::cogs;
 
 use std::cell::RefCell;
 use std::fmt;
@@ -426,7 +426,7 @@ fn build_db(
         {
             let mut tx_vec_cycle = tx_vec.iter().cycle();
             for (product, file) in name_rx {
-                let mut version;
+                let version;
                 // The code below is scoped so that the borrow of file goes out scope and
                 // the file can be moved into the DBFile constructor
                 {
@@ -446,7 +446,7 @@ fn build_db(
         for thread in threads_vec {
             let result = thread.join().unwrap();
             for (version, product, dbfile) in result {
-                let mut version_hash = product_hash.entry(product).or_insert(FnvHashMap::default());
+                let version_hash = product_hash.entry(product).or_insert(FnvHashMap::default());
                 version_hash.insert(version, dbfile);
             }
         }
@@ -476,7 +476,7 @@ fn build_db(
             let mut tx_vec_cycle = tx_vec.iter().cycle();
 
             for (product, file) in tag_rx {
-                let mut tag;
+                let tag;
                 // The code below is scoped so that the borrow of file goes out scope and
                 // the file can be moved into the DBFile constructor
                 {
@@ -484,7 +484,7 @@ fn build_db(
                     let tag_str: Vec<&str> = tag_file_name.split(".chain").collect();
                     tag = String::from(tag_str[0]);
                 }
-                let mut tags_vec = product_to_tags.entry(product.clone()).or_insert(Vec::new());
+                let tags_vec = product_to_tags.entry(product.clone()).or_insert(Vec::new());
                 tags_vec.push(tag.clone());
                 tx_vec_cycle
                     .next()
@@ -498,7 +498,7 @@ fn build_db(
         for thread in threads_vec {
             let result = thread.join().unwrap();
             for (product, tag, dbfile) in result {
-                let mut product_hash = tags_hash.entry(tag).or_insert(FnvHashMap::default());
+                let product_hash = tags_hash.entry(tag).or_insert(FnvHashMap::default());
                 product_hash.insert(product, dbfile);
             }
         }

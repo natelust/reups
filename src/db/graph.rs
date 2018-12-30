@@ -8,9 +8,9 @@ use fnv::FnvHashMap;
 
 use std::collections::HashSet;
 
-use db::graph::petgraph::visit::Walker;
-use db::table;
-use db::DB;
+use crate::db::graph::petgraph::visit::Walker;
+use crate::db::table;
+use crate::db::DB;
 use std::fmt;
 
 /**!

@@ -3,8 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  * Copyright Nate Lust 2018*/
 
-use argparse;
-use db;
+use crate::argparse;
+use crate::db;
 use fnv::{FnvHashMap, FnvHashSet};
 use std::env;
 

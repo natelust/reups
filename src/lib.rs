@@ -9,20 +9,17 @@
  library.
 */
 #[doc(hidden)]
-extern crate fnv;
+use clap;
+use dirs;
 #[doc(hidden)]
-extern crate regex;
+use fnv;
 #[doc(hidden)]
-#[macro_use]
-extern crate clap;
+use lazy_static;
 #[doc(hidden)]
-#[macro_use]
-extern crate log;
+use log::{debug, error, info, warn};
+use preferences;
 #[doc(hidden)]
-#[macro_use]
-extern crate lazy_static;
-extern crate dirs;
-extern crate preferences;
+use regex;
 #[macro_use]
 mod cogs;
 mod argparse;
@@ -33,12 +30,12 @@ mod list;
 mod logger;
 mod prep;
 mod setup;
-pub use argparse::*;
-pub use cogs::*;
-pub use completions::*;
-pub use db::*;
-pub use env::*;
-pub use list::*;
-pub use logger::*;
-pub use prep::*;
-pub use setup::*;
+pub use crate::argparse::*;
+pub use crate::cogs::*;
+pub use crate::completions::*;
+pub use crate::db::*;
+pub use crate::env::*;
+pub use crate::list::*;
+pub use crate::logger::*;
+pub use crate::prep::*;
+pub use crate::setup::*;

@@ -14,10 +14,10 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 
-use argparse;
-use db;
-use logger;
-use table;
+use crate::argparse;
+use crate::db;
+use crate::logger;
+use crate::table;
 
 // Determine the system on which this comand is run. In eups past there used to be
 // more flavors (i.e. just linux) but these systems are almost never used and are
@@ -79,9 +79,10 @@ fn setup_table(
     } else {
         setup_string_vec.push(db_path.to_str().unwrap().to_string().replace("ups_db", ""));
     }
-    info!(
+    crate::info!(
         "Setting up: {:<25}Version: {}",
-        product_table.name, product_version
+        product_table.name,
+        product_version
     );
     env_vars.insert(
         prod_dir_label,
@@ -293,7 +294,7 @@ pub fn setup_command(sub_args: &argparse::ArgMatches, _main_args: &argparse::Arg
             tags.push(t);
         }
     }
-    info!("Using tags: {:?}", tags);
+    crate::info!("Using tags: {:?}", tags);
     // Always put the current tag
     tags.push(&current);
 
@@ -391,7 +392,7 @@ pub fn setup_command(sub_args: &argparse::ArgMatches, _main_args: &argparse::Arg
                 // easiest, but it could be wrong and this code should be thought through more.
                 // FINDME
                 let mut largest_version = versions.iter().max().unwrap().clone().clone();
-                let mut node_table_option: Option<table::Table>;
+                let node_table_option: Option<table::Table>;
                 if largest_version.as_str() != "" {
                     node_table_option = db.get_table_from_version(&name, &largest_version);
                 } else {
@@ -432,7 +433,7 @@ pub fn setup_command(sub_args: &argparse::ArgMatches, _main_args: &argparse::Arg
                     (None, true) => continue,
                     (None, false) => {
                         if env::var(String::from("SETUP_") + &name.to_uppercase()).is_ok() {
-                            warn!("Product {} could not be found in the database, resolving dependency using setup version", &name);
+                            crate::warn!("Product {} could not be found in the database, resolving dependency using setup version", &name);
                             continue;
                         } else {
                             exit_with_message!(format!(
