@@ -10,12 +10,12 @@
 ///eval $(reups prep)
 pub fn build_prep_string() -> &'static str {
     "rsetup() {
-    args=\"$*\";
-    if [[ $args = *\"-h\"* ]] || [[ $args = *\"--help\"* ]];
+    local _args=\"$*\";
+    if [[ $_args = *\"-h\"* ]] || [[ $_args = *\"--help\"* ]];
     then
         reups setup \"$@\";
     else
-        eval $(reups setup $args);
+        eval $(reups setup $_args);
     fi;
 };
 
