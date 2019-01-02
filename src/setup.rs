@@ -279,24 +279,24 @@ pub fn setup_command(sub_args: &argparse::ArgMatches, _main_args: &argparse::Arg
     // nothing so we do nothing but create the database. The global arguments might affect
     // construction in the future
     logger::build_logger(sub_args, true);
-    let db = db::DB::new(None, None, None, None);
+    let db = db::DB::new(None, None, None);
 
     // We process local arguments here to set the state that will be used to setup a product
     // Create a vector for the tags to consider
-    let current = String::from("current");
+    let current = &"current";
     let mut tags_str = vec![];
-    let mut tags = vec![];
+    let mut tags: Vec<&str> = vec![];
     if sub_args.is_present("tag") {
         for t in sub_args.values_of("tag").unwrap() {
-            tags_str.push(t.to_string());
+            tags_str.push(t);
         }
         for t in tags_str.iter() {
             tags.push(t);
         }
     }
-    crate::info!("Using tags: {:?}", tags);
     // Always put the current tag
-    tags.push(&current);
+    tags.push(current);
+    crate::info!("Using tags: {:?}", tags);
 
     let product = sub_args.value_of("product");
     // Get if the command should be run in exact or inexact mode
@@ -311,12 +311,12 @@ pub fn setup_command(sub_args: &argparse::ArgMatches, _main_args: &argparse::Arg
             if !db.has_product(&name.to_string()) {
                 exit_with_message!(format!("Cannot find product `{}` to setup", name));
             }
-            let local_table = db.get_table_from_tag(&name.to_string(), tags.clone());
-            let versions = db.get_versions_from_tag(&name.to_string(), tags.clone());
+            let local_table = db.get_table_from_tag(name, &tags);
+            let versions = db.get_versions_from_tag(&name.to_string(), &tags);
             let mut version = String::from("");
             match versions.first() {
                 Some(v) => {
-                    version = v.clone();
+                    version = v.to_string();
                 }
                 None => (),
             }
@@ -363,20 +363,11 @@ pub fn setup_command(sub_args: &argparse::ArgMatches, _main_args: &argparse::Arg
         let mut env_vars: FnvHashMap<String, String> = FnvHashMap::default();
         let flavors = db.get_flavors_from_version(&table.name, &version);
         let flavor = match flavors.last() {
-            Some(flav) => flav.clone(),
+            Some(flav) => flav.to_string(),
             None => String::from(""),
         };
 
-        // Determine the path to the database that contains this product
-        let db_dirs = db.get_db_directories();
-        // This works because there are 2 dbs, the first is always the system one
-        // the second is always the user db. and we always want to take the entry from
-        // the end if it exists, in this case that is the flavor entry
-        let db_path = match flavors.len() {
-            1 => db_dirs[0].clone(),
-            2 => db_dirs[1].clone(),
-            _ => PathBuf::from(""), // Needed to satisfy rust matching
-        };
+        let db_path = db.get_database_path_from_version(&table.name, &version);
 
         // Keep should always be false for the first product to setup, as this is the
         // directory the user specified, so clearly they want to set it up.
@@ -396,11 +387,11 @@ pub fn setup_command(sub_args: &argparse::ArgMatches, _main_args: &argparse::Arg
                 if largest_version.as_str() != "" {
                     node_table_option = db.get_table_from_version(&name, &largest_version);
                 } else {
-                    node_table_option = db.get_table_from_tag(&name, tags.clone());
-                    let versions = db.get_versions_from_tag(&name, tags.clone());
+                    node_table_option = db.get_table_from_tag(&name, &tags);
+                    let versions = db.get_versions_from_tag(&name, &tags);
                     match versions.last() {
                         Some(v) => {
-                            largest_version = v.clone();
+                            largest_version = v.to_string();
                         }
                         None => (),
                     }
@@ -410,17 +401,11 @@ pub fn setup_command(sub_args: &argparse::ArgMatches, _main_args: &argparse::Arg
                         let flavors =
                             db.get_flavors_from_version(&node_table.name, &largest_version);
                         let flavor = match flavors.last() {
-                            Some(flav) => flav.clone(),
+                            Some(flav) => flav.to_string(),
                             None => String::from(""),
                         };
-                        // This works because there are 2 dbs, the first is always the system one
-                        // the second is always the user db. and we always want to take the entry from
-                        // the end if it exists, in this case that is the flavor entry
-                        let db_path = match flavors.len() {
-                            1 => db_dirs[0].clone(),
-                            2 => db_dirs[1].clone(),
-                            _ => PathBuf::from(""), // Needed to satisfy rust matching
-                        };
+                        let db_path =
+                            db.get_database_path_from_version(&node_table.name, &largest_version);
                         setup_table(
                             &largest_version,
                             &node_table,

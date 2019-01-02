@@ -63,13 +63,14 @@ impl<'a> ListImpl<'a> {
             || sub_args.is_present("tags")
             || sub_args.is_present("onlyTags")
             || sub_args.is_present("onlyVers")
+            || sub_args.is_present("sources")
         {
             None
         } else {
             // Mark the database to preload all the tag files off disk
             Some(db::DBLoadControl::Tags)
         };
-        let db = db::DB::new(None, None, None, preload);
+        let db = db::DB::new(None, None, preload);
         // get any products that are currently setup
         let (current_products, local_setups) = find_setup_products();
         // String to hold the output
@@ -92,6 +93,27 @@ impl<'a> ListImpl<'a> {
     /// gained from environment variables. Its result is the requested information is
     /// printed out to the user in the console.
     fn run(&mut self) {
+        if self.sub_args.is_present("sources") {
+            self.run_sources();
+        } else {
+            self.run_product();
+        }
+        println!("{}", self.output_string.trim_end_matches("\n"));
+    }
+
+    fn run_sources(&mut self) {
+        let database_sources = self.db.get_db_sources();
+        self.output_string.push_str("Source Identifier: Location\n");
+        for (name, location) in database_sources.iter() {
+            self.output_string.push_str(&format!(
+                "{}: {}\n",
+                name,
+                location.to_str().expect("Issue unwrapping path")
+            ));
+        }
+    }
+
+    fn run_product(&mut self) {
         // If the user specified a specific product only generate output for that product
         let mut product_vec = if self.sub_args.is_present("product") {
             vec![self.sub_args.value_of("product").unwrap().to_string()]
@@ -110,7 +132,11 @@ impl<'a> ListImpl<'a> {
         }
         // Baring any input from the user, list all products found in the user and system databases
         else {
-            self.db.get_all_products()
+            self.db
+                .get_all_products()
+                .iter()
+                .map(|a| a.to_string())
+                .collect()
         };
 
         // check if we should restrict printing
@@ -139,7 +165,6 @@ impl<'a> ListImpl<'a> {
         for product in product_vec.iter() {
             self.print_product(product, select_printing.clone());
         }
-        println!("{}", self.output_string.trim_right_matches("\n\n"));
     }
 
     /**
@@ -147,11 +172,16 @@ impl<'a> ListImpl<'a> {
      * all the information required about the product from the database, formats
      * it, and appends it to the output string.
      */
-    fn print_product(&mut self, product: &String, select_printing: OnlyPrint) {
+    fn print_product(&mut self, product: &str, select_printing: OnlyPrint) {
         // If the user supplied tags, use those when determining the tags and
         // versions to print, else grab all tags associated with the given product
         let tags = if self.tags.is_some() {
-            self.tags.as_ref().unwrap().clone()
+            self.tags
+                .as_ref()
+                .unwrap()
+                .iter()
+                .map(|a| a.as_str())
+                .collect()
         } else {
             self.db.product_tags(product)
         };
@@ -167,20 +197,25 @@ impl<'a> ListImpl<'a> {
                 if !self.sub_args.is_present("local") {
                     for tag in tags.iter() {
                         if let OnlyPrint::All = select_printing {
-                            let versions = self.db.get_versions_from_tag(product, vec![tag]);
+                            let versions = self.db.get_versions_from_tag(product, &vec![tag]);
                             for v in versions {
-                                version_to_tags.entry(v).or_insert(vec![]).push(tag);
+                                version_to_tags
+                                    .entry(v)
+                                    .or_insert(Vec::<&str>::default())
+                                    .push(tag);
                             }
                         }
                     }
                 }
                 // look for any local version that might be setup
                 if let Some(local) = self.local_setups.get(product) {
-                    version_to_tags.entry(local.clone()).or_insert(vec![]);
+                    version_to_tags
+                        .entry(local)
+                        .or_insert(Vec::<&str>::default());
                 }
 
                 // Turn the hashmap into a vector
-                let mut version_to_tags_vec: Vec<(String, Vec<&String>)> =
+                let mut version_to_tags_vec: Vec<(&str, Vec<&str>)> =
                     version_to_tags.into_iter().collect();
                 // Sort the versions vector by version
                 version_to_tags_vec.sort_by(|tup1, tup2| tup1.0.cmp(&tup2.0));
@@ -195,20 +230,24 @@ impl<'a> ListImpl<'a> {
                             tags.iter()
                                 .fold(String::from("["), |acc, &x| {
                                     // if the tag is current, color the string
-                                    let name = if *x == "current" {
-                                        "\x1b[96mcurrent\x1b[0m".to_owned()
+                                    let name = if x == "current" {
+                                        "\x1b[96mcurrent\x1b[0m"
                                     } else {
-                                        (*x).clone()
+                                        x
                                     };
                                     acc + &name + ", "
                                 })
                                 .trim_right_matches(", ")
-                        ).as_str()
-                            .trim(),
+                        )
+                        .as_str()
+                        .trim(),
                     );
                     // Check if this product and version match any that are setup,
                     // and if so add a colored setup string
-                    if self.current_products.contains(&(product.clone(), ver)) {
+                    if self
+                        .current_products
+                        .contains(&(product.to_string(), ver.to_string()))
+                    {
                         self.output_string.push_str("    \x1b[92mSetup\x1b[0m");
                     }
                     self.output_string.push_str("\n\n");
@@ -222,7 +261,7 @@ impl<'a> ListImpl<'a> {
                         "",
                         tags.iter()
                             .fold(String::from("["), |acc, x| {
-                                let name = if x == "current" {
+                                let name = if x == &"current" {
                                     "\x1b[96mcurrent\x1b[0m"
                                 } else {
                                     &x
@@ -230,8 +269,9 @@ impl<'a> ListImpl<'a> {
                                 acc + name + ", "
                             })
                             .trim_right_matches(", ")
-                    ).as_str()
-                        .trim(),
+                    )
+                    .as_str()
+                    .trim(),
                 );
                 self.output_string.push_str("\n\n");
             }
@@ -242,7 +282,7 @@ impl<'a> ListImpl<'a> {
                     vec![]
                 };
                 if let Some(local) = self.local_setups.get(product) {
-                    versions.push(local.clone());
+                    versions.push(local);
                 }
                 self.output_string
                     .push_str(format!("{:25}{:10}", product, "").as_str());
@@ -250,12 +290,12 @@ impl<'a> ListImpl<'a> {
                 for version in versions {
                     if self
                         .current_products
-                        .contains(&(product.clone(), version.clone()))
+                        .contains(&(product.to_string(), version.to_string()))
                     {
                         self.output_string
                             .push_str(format!("\x1b[92m{}\x1b[0m", version).as_str());
                     } else {
-                        self.output_string.push_str(version.as_str());
+                        self.output_string.push_str(version);
                     }
                     self.output_string.push_str(", ");
                 }

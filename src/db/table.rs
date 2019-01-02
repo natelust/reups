@@ -74,8 +74,10 @@ impl Table {
         prod_dir: path::PathBuf,
     ) -> Result<Table, io::Error> {
         let mut f = File::open(path.clone())?;
+        crate::debug!("Opened file {}", path.to_str().unwrap());
         let mut contents = String::new();
         f.read_to_string(&mut contents)?;
+        crate::debug!("Read file {}", path.to_str().unwrap());
         // Get the exact mapping
         // Dereferencing and taking a reference is nesseary to cause the
         // lazy static object defined at the top to be evaluated and turned into

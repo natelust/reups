@@ -64,12 +64,12 @@ fn build_list<'a, 'b>() -> App<'a, 'b> {
                           .arg(Arg::with_name("product")
                                .help("Name of product to list (optional)")
                                .index(1)
-                               .conflicts_with_all(&["setup", "local"]))
+                               .conflicts_with_all(&["setup", "local", "sources"]))
                           .arg(Arg::with_name("setup")
                                .help("List only setup products")
                                .short("s")
                                .long("setup")
-                               .conflicts_with_all(&["product", "local"]))
+                               .conflicts_with_all(&["product", "local", "sources"]))
                           .arg(Arg::with_name("tags")
                                .help("List only these tags (does not include current)")
                                .short("t")
@@ -88,7 +88,11 @@ fn build_list<'a, 'b>() -> App<'a, 'b> {
                                .help("Only list products that are setup as local products")
                                .short("l")
                                .long("local")
-                               .conflicts_with_all(&["product", "setup"]));
+                               .conflicts_with_all(&["product", "setup", "sources"]))
+                          .arg(Arg::with_name("sources")
+                               .help("List identifier and path of all the sources that went into the database")
+                               .long("sources")
+                               .conflicts_with_all(&["product", "setup", "local"]));
 }
 
 /**

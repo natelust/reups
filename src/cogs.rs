@@ -28,30 +28,42 @@ macro_rules! exit_with_message {
     };
 }
 
+/// Splits apart a string with paths separated by colons into a vector of paths
+pub fn path_string_to_vec(path_string: &str) -> Option<Vec<PathBuf>> {
+    let eups_path_vec: Vec<&str> = path_string.split(":").collect();
+    if eups_path_vec.is_empty() {
+        return None;
+    }
+    let eups_pathbuf_vec: Vec<PathBuf> = eups_path_vec
+        .iter()
+        .map(|path| {
+            let mut converted_path = PathBuf::from(path);
+            converted_path.push("ups_db");
+            if !converted_path.is_dir() {
+                exit_with_message!(format!("{} does not appear to be an eups database", path));
+            }
+            converted_path
+        })
+        .collect();
+    Some(eups_pathbuf_vec)
+}
+
 /// Returns the eups system path as determined from the EUPS_PATH environment variable.
 ///
 /// If EUPS_PATH contains more than one database path, they should be seperated by a pipe
 /// character. This function will return the first database path, as it should be the most
 /// recently added to the environment.
-pub fn get_eups_path_from_env() -> PathBuf {
+pub fn get_eups_path_from_env() -> Vec<PathBuf> {
     let env_var = env::var("EUPS_PATH").unwrap_or_else(|e| {
         exit_with_message!(format!("Problem loading eups path: {}", e));
     });
-    let eups_path_vec: Vec<&str> = env_var.split(":").collect();
-    // only return the first member of the vec, which should be the most
-    // recently added eups path
-    let eups_path_option = eups_path_vec.first();
-    let mut eups_path = match eups_path_option {
-        Some(eups_path) => PathBuf::from(eups_path),
+    crate::debug!("Found {} in environment variable", env_var);
+    let system_paths_option = path_string_to_vec(env_var.as_str());
+    match system_paths_option {
+        Some(system_paths) => system_paths,
         None => {
-            exit_with_message!("Problem loading eups path from env var");
+            exit_with_message!("Problem loading eups paths from env");
         }
-    };
-    eups_path.push("ups_db");
-    if eups_path.is_dir() {
-        eups_path
-    } else {
-        exit_with_message!("Eups path defined in env var does not appear to be a directory");
     }
 }
 

@@ -14,9 +14,9 @@ use crate::db::DB;
 use std::fmt;
 
 /**!
-  The module graph contains all the machinery for turning products described
-  by table files into a relational graph of those products.
- */
+ The module graph contains all the machinery for turning products described
+ by table files into a relational graph of those products.
+*/
 
 /// Describes if a node in the graph represents an optional dependency, or
 /// a required dependency
@@ -139,13 +139,13 @@ impl<'a> Graph<'a> {
     pub fn add_product_by_tag(
         &mut self,
         product: String,
-        tag: &Vec<&String>,
+        tag: &Vec<&str>,
         version_type: table::VersionType,
         node_type: NodeType,
         recurse: bool,
     ) {
         if !self._processed.contains(&product) {
-            let result = self._db.get_table_from_tag(&product, tag.clone());
+            let result = self._db.get_table_from_tag(&product, tag);
             if let Some(table) = result {
                 self.add_table(&table, version_type, node_type, Some(tag), recurse);
             }
@@ -178,7 +178,7 @@ impl<'a> Graph<'a> {
         table: &table::Table,
         version_type: table::VersionType,
         node_type: NodeType,
-        tag: Option<&Vec<&String>>,
+        tag: Option<&Vec<&str>>,
         recurse: bool,
     ) {
         let top = &table.name;
