@@ -1,3 +1,16 @@
+0.3.0
+Fix scope of variables in reups prep
+Update to rust 2018
+Switch home_dir lookup function
+Introduce env subcommand and doc changes
+Update deps for rust compiler changes
+Only list local setups with --local
+Use keep flag only for dependencies
+Run rustfmt on codebase
+Add documentation and comments to reups
+Rename reups library to reups_lib
+Bump Cargo.lock for version 0.2.1
+Make completions gen compitions for rsetup
 0.2.1
 Update reups version to 0.2.1
 Add subcommand to build shell completions
