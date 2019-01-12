@@ -58,7 +58,7 @@ pub struct Deps {
 #[derive(Debug, Clone)]
 pub struct Table {
     pub name: String,
-    pub path: path::PathBuf,
+    pub path: Option<path::PathBuf>,
     pub product_dir: path::PathBuf,
     pub exact: Option<Deps>,
     pub inexact: Option<Deps>,
@@ -68,7 +68,7 @@ pub struct Table {
 impl Table {
     /// Creates a new Table object given the product name to assign, the path to the
     /// table file, and the directory the product is located in
-    pub fn new(
+    pub fn from_file(
         name: String,
         path: path::PathBuf,
         prod_dir: path::PathBuf,
@@ -102,7 +102,7 @@ impl Table {
         }
         Ok(Table {
             name: name,
-            path: path,
+            path: Some(path),
             product_dir: prod_dir,
             exact: exact,
             inexact: inexact,

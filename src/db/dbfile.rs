@@ -52,6 +52,15 @@ impl DBFile {
         db_file
     }
 
+    pub fn new_with_contents(path: path::PathBuf, file_contents: String) -> DBFile {
+        let db_file = DBFile {
+            path: path,
+            contents: RefCell::new(FnvHashMap::default()),
+        };
+        db_file.parse_string(file_contents);
+        db_file
+    }
+
     /// Retrieves the value of the DBFile corresponding to the supplied key
     pub fn entry(&self, key: &str) -> Option<&str> {
         let db_is_empty: bool;
@@ -105,7 +114,12 @@ impl DBFile {
             self.path.to_str().unwrap()
         );
         let contents = fs::read_to_string(&self.path)?;
+        self.parse_string(contents);
 
+        Ok(())
+    }
+
+    fn parse_string(&self, contents: String) {
         for line in contents.lines() {
             for (i, char) in line.char_indices() {
                 if char == '=' {
@@ -118,7 +132,5 @@ impl DBFile {
                 }
             }
         }
-
-        Ok(())
     }
 }

@@ -17,9 +17,12 @@ pub mod table;
 use self::dbfile::DBFile;
 use crate::cogs;
 
+use self::db_impl::DBImplDeclare;
+pub use self::db_impl::DeclareInputs;
 use std::cell::RefCell;
 use std::fmt;
 use std::path::PathBuf;
+use std::fs::OpenOptions;
 
 /// Data structure to hold state related to iterating over a db object.
 /// This iteration is used to loop over all the instance of DBImpls
@@ -97,8 +100,7 @@ impl DB {
         preload: Option<DBLoadControl>,
     ) -> DB {
         // Create a db hashmap
-        let mut database_map =
-            FnvHashMap::<String, Box<dyn db_impl::DBImpl<table::Table>>>::default();
+        let mut database_map = FnvHashMap::<String, Box<db_impl::DBImpl<table::Table>>>::default();
         // Create a list of db names to maintain insertion order
         let mut database_names = vec![];
 
@@ -394,4 +396,79 @@ impl DB {
         }
         return false;
     }
+
+    /// Declares a new product to the database
+    pub fn declare(
+        self,
+        inputs: Vec<db_impl::DeclareInputs>,
+        source: Option<&str>,
+    ) -> DeclareResults {
+        let source_name = if let Some(src) = source {
+            if !self.database_map.contains_key(src) {
+                return DeclareResults::NoSource(self);
+            }
+            if !self
+                .database_map
+                .get(src)
+                .unwrap()
+                .get_location()
+                .metadata()
+                .expect(&format!("Problem with metadata on source {} path", src))
+                .permissions()
+                .readonly()
+            {
+                src.to_string()
+            } else {
+                return DeclareResults::NoneWritable(self);
+            }
+        } else {
+            let mut write_set: Vec<String> = vec![];
+            for (name, db) in self.iter() {
+                let mut test = db.get_location().clone();
+                test.push("readonly_test_file.txt");
+                
+                let per = OpenOptions::new().append(true).create(true).open(test.clone());
+                let writable = match per {
+                    Err(_) => false,
+                    Ok(_) => true,
+                };
+                crate::debug!("database source {} is writeable {}", name, writable);
+                drop(per);
+                if writable {
+                    std::fs::remove_file(test).expect("Problem cleaning up readonly test file");
+                    write_set.push(name.to_string());
+                }
+
+            }
+            crate::debug!("found {} writable db sources", write_set.len());
+            match write_set.len() {
+                0 => return DeclareResults::NoneWritable(self),
+                1 => write_set.remove(0),
+                _ => return DeclareResults::MultipleWriteable(self),
+            }
+        };
+
+        let mut this = self;
+        let active_db = this.database_map.remove(&source_name).unwrap();
+        crate::debug!("Adding input into database source {}", source_name);
+        let new_result = active_db.declare(&inputs);
+        match new_result {
+            Err(new) => {
+                this.database_map.insert(source_name.clone(), new);
+                return DeclareResults::Error(this, source_name)
+            },
+            Ok(new) => {
+                this.database_map.insert(source_name.clone(), new);
+                return DeclareResults::Success(this, source_name)
+            }
+        }
+    }
+}
+
+pub enum DeclareResults {
+    MultipleWriteable(DB),
+    NoneWritable(DB),
+    Success(DB, String),
+    Error(DB, String),
+    NoSource(DB),
 }

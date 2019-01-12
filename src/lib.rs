@@ -9,15 +9,7 @@
  library.
 */
 #[doc(hidden)]
-use clap;
-use dirs;
-#[doc(hidden)]
-use fnv;
-#[doc(hidden)]
-use lazy_static;
-#[doc(hidden)]
 use log::{debug, error, info, warn};
-use preferences;
 #[doc(hidden)]
 use regex;
 #[macro_use]
@@ -25,6 +17,7 @@ mod cogs;
 mod argparse;
 mod completions;
 mod db;
+mod declare;
 mod env;
 mod list;
 mod logger;
@@ -34,6 +27,7 @@ pub use crate::argparse::*;
 pub use crate::cogs::*;
 pub use crate::completions::*;
 pub use crate::db::*;
+pub use crate::declare::*;
 pub use crate::env::*;
 pub use crate::list::*;
 pub use crate::logger::*;

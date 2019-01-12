@@ -142,6 +142,9 @@ fn main() {
         ("env", Some(m)) => {
             reups::env_command(m, &args);
         }
+        ("declare", Some(m)) => {
+            reups::declare_command(m, &args);
+        }
         _ => println!("{}", args.usage()),
     }
 }

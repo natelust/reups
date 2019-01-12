@@ -110,8 +110,8 @@ fn build_completions<'a, 'b>() -> App<'a, 'b> {
 }
 
 /**
- * Builds the completetions for the sub command env. This allows the reups commands run in one
- * shell to be recored and replayed in another shell
+ * Builds the completions for the sub command env. This allows the reups commands run in one
+ * shell to be recorded and replayed in another shell
  */
 fn build_env<'a, 'b>() -> App<'a, 'b> {
     return SubCommand::with_name("env")
@@ -126,6 +126,61 @@ fn build_env<'a, 'b>() -> App<'a, 'b> {
             Arg::with_name("name")
                 .required(false)
                 .help("Optional name to save/restore"),
+        )
+        .arg(
+            Arg::with_name("verbose")
+                .short("v")
+                .long("verbose")
+                .multiple(true)
+                .help("Sets the level of verbosity, multiple occurances increases verbosity"),
+        );
+}
+
+/**
+ * Builds cli interface for the subcommand declare. This allows new products to be declared to the
+ * database.
+ **/
+fn build_declare<'a, 'b>() -> App<'a, 'b> {
+    return SubCommand::with_name("declare")
+        .about("Declare a new product to the reups database")
+        .arg(
+            Arg::with_name("product")
+                .required(true)
+                .help("Product name"),
+        )
+        .arg(
+            Arg::with_name("version")
+                .required(true)
+                .help("Version name/number to assign to product"),
+        )
+        .arg(
+            Arg::with_name("path")
+                .required(true)
+                .help("Path to directory of product to declare")
+                .short("r")
+                .long("root")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("tag")
+                .required(false)
+                .help("Tag to assign to product")
+                .short("t")
+                .long("tag")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("source")
+                .required(false)
+                .help("Database source to declare to, list with reups list --sources")
+                .long("source"),
+        )
+        .arg(
+            Arg::with_name("ident")
+                .required(false)
+                .help("Unique identifier to assign to product")
+                .long("ident")
+                .takes_value(true),
         )
         .arg(
             Arg::with_name("verbose")
@@ -159,6 +214,7 @@ pub fn build_cli() -> App<'static, 'static> {
         .subcommand(build_list())
         .subcommand(build_completions())
         .subcommand(build_env())
+        .subcommand(build_declare())
 }
 
 /**

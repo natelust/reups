@@ -15,17 +15,10 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::argparse;
+use crate::cogs;
 use crate::db;
 use crate::logger;
 use crate::table;
-
-// Determine the system on which this comand is run. In eups past there used to be
-// more flavors (i.e. just linux) but these systems are almost never used and are
-// dropped from consideration in reups.
-#[cfg(target_os = "macos")]
-static SYSTEM_OS: &str = "Darwin64";
-#[cfg(target_os = "linux")]
-static SYSTEM_OS: &str = "Linux64";
 
 /// Given a product's version and table file, this function creates all the appropriate
 /// environment variable entries given the supplied options.
@@ -67,13 +60,14 @@ fn setup_table(
     // if there is no flavor use the system os as platform
     setup_string_vec.push("-f".to_string());
     if flavor.is_empty() {
-        setup_string_vec.push(SYSTEM_OS.to_string());
+        setup_string_vec.push(cogs::SYSTEM_OS.to_string());
     } else {
         setup_string_vec.push(flavor.clone());
     }
 
     // Set db dir to none if there is no db dir (local setup)
     setup_string_vec.push("-Z".to_string());
+    crate::debug!("Using database path: {}", db_path.to_str().unwrap());
     if db_path.to_str().unwrap().is_empty() {
         setup_string_vec.push("\\(none\\)".to_string());
     } else {
@@ -206,7 +200,7 @@ fn get_table_path_from_input(input_path: &str) -> Option<table::Table> {
         let table_file = table_file.canonicalize().unwrap();
         let prod_dir = prod_dir.unwrap().canonicalize().unwrap();
         let name = String::from(table_file.file_stem().unwrap().to_str().unwrap());
-        Some(table::Table::new(name, table_file, prod_dir).unwrap())
+        Some(table::Table::from_file(name, table_file, prod_dir).unwrap())
     } else {
         return None;
     }
@@ -329,7 +323,16 @@ pub fn setup_command(sub_args: &argparse::ArgMatches, _main_args: &argparse::Arg
             let mut version = String::from("");
             if table.is_some() {
                 let mut tmp = String::from("LOCAL:");
-                tmp.push_str(table.as_ref().unwrap().path.to_str().unwrap());
+                tmp.push_str(
+                    table
+                        .as_ref()
+                        .unwrap()
+                        .path
+                        .as_ref()
+                        .unwrap()
+                        .to_str()
+                        .unwrap(),
+                );
                 version = tmp
             }
             mode = table::VersionType::Inexact;

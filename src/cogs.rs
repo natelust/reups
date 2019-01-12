@@ -16,6 +16,14 @@ use dirs;
 use std::env;
 use std::path::PathBuf;
 
+// Determine the system on which this comand is run. In eups past there used to be
+// more flavors (i.e. just linux) but these systems are almost never used and are
+// dropped from consideration in reups.
+#[cfg(target_os = "macos")]
+pub static SYSTEM_OS: &str = "Darwin64";
+#[cfg(target_os = "linux")]
+pub static SYSTEM_OS: &str = "Linux64";
+
 /** Macro used to print an error message to the console and terminate execution
  *
  * This may be replaced in the future with the use of a logging system.

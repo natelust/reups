@@ -26,3 +26,5 @@ fnv = "1.0.6"
 preferences = "^1.1.0"
 dirs = "1.0.4"
 log = { version = "0.4", features = ["std", "serde"] }
+users = "0.8.1"
+time = "0.1.42"
