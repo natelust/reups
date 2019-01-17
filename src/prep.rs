@@ -20,11 +20,11 @@ pub fn build_prep_string() -> &'static str {
 };
 
 rrestore() {
-eval $(reups env restore $args);
+eval $(reups env restore \"$*\");
 };
 
 rsave() {
-reups env save $args;
+reups env save \"$*\";
 };
 "
 }
