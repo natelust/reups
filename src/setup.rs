@@ -314,7 +314,7 @@ pub fn setup_command(sub_args: &argparse::ArgMatches, _main_args: &argparse::Arg
             let local_table = db.get_table_from_tag(&name.to_string(), tags.clone());
             let versions = db.get_versions_from_tag(&name.to_string(), tags.clone());
             let mut version = String::from("");
-            match versions.last() {
+            match versions.first() {
                 Some(v) => {
                     version = v.clone();
                 }
