@@ -58,8 +58,8 @@ impl PosixDBImpl {
         path: PathBuf,
         preload: Option<&DBLoadControl>,
         ident_regex: Option<regex::Regex>,
-    ) -> PosixDBImpl {
-        let (directory, product_to_info, tags_to_info, product_to_tags) = build_db(path, preload);
+    ) -> Result<PosixDBImpl, String> {
+        let (directory, product_to_info, tags_to_info, product_to_tags) = build_db(path, preload)?;
         let (product_to_ident, product_ident_version) = if ident_regex.is_some() {
             let mut product_to_ident = FnvHashMap::<String, Vec<String>>::default();
             let mut product_ident_version =
@@ -83,14 +83,14 @@ impl PosixDBImpl {
         } else {
             (None, None)
         };
-        PosixDBImpl {
+        Ok(PosixDBImpl {
             directory,
             tag_to_product_info: tags_to_info,
             product_to_version_info: product_to_info,
             product_to_tags,
             product_to_ident,
             product_ident_version,
-        }
+        })
     }
 
     fn format_template_file(
@@ -546,12 +546,15 @@ impl super::DBImpl<Table> for PosixDBImpl {
 fn build_db(
     eups_path: PathBuf,
     load_options: Option<&DBLoadControl>,
-) -> (
-    path::PathBuf,
-    FnvHashMap<String, FnvHashMap<String, DBFile>>,
-    FnvHashMap<String, FnvHashMap<String, DBFile>>,
-    FnvHashMap<String, Vec<String>>,
-) {
+) -> Result<
+    (
+        path::PathBuf,
+        FnvHashMap<String, FnvHashMap<String, DBFile>>,
+        FnvHashMap<String, FnvHashMap<String, DBFile>>,
+        FnvHashMap<String, Vec<String>>,
+    ),
+    String,
+> {
     // Create channels that each of the threads will communicate over
     let (name_tx, name_rx) = mpsc::channel::<(String, path::PathBuf)>();
     let (tag_tx, tag_rx) = mpsc::channel::<(String, path::PathBuf)>();
@@ -712,6 +715,14 @@ fn build_db(
         // create an iterator that cycles between the worker transmitter such
         // that the work will be distributed to each worker in sequence
         let mut worker_iter = worker_tx_vec.iter().cycle();
+        let directory_iterator = fs::read_dir(eups_path.clone());
+        if !directory_iterator.is_ok() {
+            return Err(format!(
+                "Problem reading database at {}",
+                eups_path.to_str().unwrap()
+            )
+            .to_string());
+        }
         for entry in fs::read_dir(eups_path.clone()).expect("issue in main list") {
             worker_iter
                 .next()
@@ -737,5 +748,5 @@ fn build_db(
     let product_to_info = names_thread.join().unwrap();
     let (tags_to_info, product_to_tags) = tags_thread.join().unwrap();
 
-    (eups_path, product_to_info, tags_to_info, product_to_tags)
+    Ok((eups_path, product_to_info, tags_to_info, product_to_tags))
 }

@@ -21,8 +21,8 @@ use self::db_impl::DBImplDeclare;
 pub use self::db_impl::DeclareInputs;
 use std::cell::RefCell;
 use std::fmt;
-use std::path::PathBuf;
 use std::fs::OpenOptions;
+use std::path::PathBuf;
 
 /// Data structure to hold state related to iterating over a db object.
 /// This iteration is used to loop over all the instance of DBImpls
@@ -69,6 +69,114 @@ pub enum DBLoadControl {
     All,
 }
 
+pub struct DBBuilder {
+    eups_env: bool,
+    eups_user: bool,
+    db_sources: FnvHashMap<String, PathBuf>,
+    extra_id: u32,
+}
+
+type BuildBundle = Result<DBBuilder, String>;
+
+impl DBBuilder {
+    pub fn new() -> BuildBundle {
+        Ok(DBBuilder {
+            eups_env: true,
+            eups_user: true,
+            db_sources: FnvHashMap::default(),
+            extra_id: 0,
+        })
+    }
+}
+
+pub trait DBBuilderTrait {
+    fn add_eups_env(self, x: bool) -> BuildBundle;
+    fn add_eups_user(self, x: bool) -> BuildBundle;
+    fn add_path_str(self, path_str: &str) -> BuildBundle;
+    fn add_path_vec(self, path_vec: Vec<PathBuf>) -> BuildBundle;
+    fn add_path(self, pth: PathBuf) -> BuildBundle;
+    fn build(self) -> Result<DB, String>;
+}
+
+impl DBBuilderTrait for BuildBundle {
+    fn add_eups_env(self, x: bool) -> BuildBundle {
+        let mut me = self?;
+        me.eups_env = x;
+        Ok(me)
+    }
+
+    fn add_eups_user(self, x: bool) -> BuildBundle {
+        let mut me = self?;
+        me.eups_user = x;
+        Ok(me)
+    }
+
+    fn add_path_str(self, path_str: &str) -> BuildBundle {
+        match cogs::path_string_to_vec(path_str) {
+            Ok(path_vec) => {
+                self.add_path_vec(path_vec)
+            }
+            Err(msg) => Err(msg),
+        }
+    }
+
+    fn add_path_vec(self, path_vec: Vec<PathBuf>) -> BuildBundle {
+        let mut me = self?;
+        for pth in path_vec {
+            me = Ok(me).add_path(pth)?;
+        }
+        Ok(me)
+    }
+
+    fn add_path(self, pth: PathBuf) -> BuildBundle {
+        let mut me = self?;
+        me.db_sources.insert(format!("Extra_{}", me.extra_id), pth);
+        me.extra_id += 1;
+        Ok(me)
+    }
+
+    fn build(self) -> Result<DB, String> {
+        let mut db_dict = FnvHashMap::default();
+        let me = self?;
+        let me = if me.eups_env == true {
+            let eups_env_path = cogs::get_eups_path_from_env();
+            for pth in eups_env_path.iter() {
+            crate::debug!(
+                "Adding {} to databases",
+                pth.to_str().expect("Malformed database string")
+            );
+            let temp_db = match db_impl::PosixDBImpl::new(pth.clone(), preload.as_ref(), None) {
+                Ok(x) => x,
+                Err(msg) => {
+                    return Err(msg)
+                }
+            };
+            // expect should be safe here, as we pushed a directory on previously
+            // Format the database map name in a deterministic way with the last bit of the path
+            let db_name = format!(
+                "posix_system_{}",
+                path.parent()
+                    .expect("Problem with database path after stripping off upd_db")
+                    .file_name()
+                    .expect("There was a problem getting the final directory in database path")
+                    .to_str()
+                    .expect("Problem turning directory osString to str")
+            );
+            db_dict.insert(db_name.clone(), Box::new(temp_db));
+            database_names.push(db_name);
+
+            Ok(me).add_path_vec(eups_env_path)
+            }
+        };
+        let me = if (me.eups_user) {
+            let eups_user_path = cogs::get_user_path_from_home();
+            if eups_user_path.is_some() {
+                Ok(me).add_path_vec(vec![eups_user_path])
+            }
+        }
+    }
+}
+
 /// Database object that library consumers interact though. This DB encodes all the
 /// relations between products, versions, tags, and tables that are encoded in the
 /// filesystem based database.
@@ -110,8 +218,8 @@ impl DB {
             Some(path) => {
                 let paths = cogs::path_string_to_vec(path);
                 match paths {
-                    Some(split_paths) => split_paths,
-                    None => {
+                    Ok(split_paths) => split_paths,
+                    _ => {
                         exit_with_message!(format!("Cannot parse {} into system paths", path));
                     }
                 }
@@ -123,7 +231,12 @@ impl DB {
                 "Adding {} to databases",
                 path.to_str().expect("Malformed database string")
             );
-            let temp_db = db_impl::PosixDBImpl::new(path.clone(), preload.as_ref(), None);
+            let temp_db = match db_impl::PosixDBImpl::new(path.clone(), preload.as_ref(), None) {
+                Ok(x) => x,
+                Err(msg) => {
+                    exit_with_message!(msg);
+                }
+            };
             // expect should be safe here, as we pushed a directory on previously
             // Format the database map name in a deterministic way with the last bit of the path
             let db_name = format!(
@@ -165,7 +278,13 @@ impl DB {
                     .to_str()
                     .expect("Malformed database string")
             );
-            let user_db = db_impl::PosixDBImpl::new(user_db_path.unwrap(), preload.as_ref(), None);
+            let user_db =
+                match db_impl::PosixDBImpl::new(user_db_path.unwrap(), preload.as_ref(), None) {
+                    Ok(x) => x,
+                    Err(msg) => {
+                        exit_with_message!(msg);
+                    }
+                };
             let database_name = String::from("posix_user");
             database_map.insert(database_name.clone(), Box::new(user_db));
             database_names.push(database_name);
@@ -426,8 +545,11 @@ impl DB {
             for (name, db) in self.iter() {
                 let mut test = db.get_location().clone();
                 test.push("readonly_test_file.txt");
-                
-                let per = OpenOptions::new().append(true).create(true).open(test.clone());
+
+                let per = OpenOptions::new()
+                    .append(true)
+                    .create(true)
+                    .open(test.clone());
                 let writable = match per {
                     Err(_) => false,
                     Ok(_) => true,
@@ -438,7 +560,6 @@ impl DB {
                     std::fs::remove_file(test).expect("Problem cleaning up readonly test file");
                     write_set.push(name.to_string());
                 }
-
             }
             crate::debug!("found {} writable db sources", write_set.len());
             match write_set.len() {
@@ -455,11 +576,11 @@ impl DB {
         match new_result {
             Err(new) => {
                 this.database_map.insert(source_name.clone(), new);
-                return DeclareResults::Error(this, source_name)
-            },
+                return DeclareResults::Error(this, source_name);
+            }
             Ok(new) => {
                 this.database_map.insert(source_name.clone(), new);
-                return DeclareResults::Success(this, source_name)
+                return DeclareResults::Success(this, source_name);
             }
         }
     }

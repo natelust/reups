@@ -37,23 +37,29 @@ macro_rules! exit_with_message {
 }
 
 /// Splits apart a string with paths separated by colons into a vector of paths
-pub fn path_string_to_vec(path_string: &str) -> Option<Vec<PathBuf>> {
+pub fn path_string_to_vec(path_string: &str) -> Result<Vec<PathBuf>, String> {
     let eups_path_vec: Vec<&str> = path_string.split(":").collect();
     if eups_path_vec.is_empty() {
-        return None;
+        return Err("Path is empty".to_string());
     }
     let eups_pathbuf_vec: Vec<PathBuf> = eups_path_vec
         .iter()
-        .map(|path| {
+        .filter_map(|path| {
             let mut converted_path = PathBuf::from(path);
             converted_path.push("ups_db");
             if !converted_path.is_dir() {
-                exit_with_message!(format!("{} does not appear to be an eups database", path));
+                return None;
             }
-            converted_path
+            Some(converted_path)
         })
         .collect();
-    Some(eups_pathbuf_vec)
+    if eups_path_vec.len() != eups_pathbuf_vec.len() {
+        return Err(format!(
+            "One of the paths specified in {} is not a valid db",
+            path_string
+        ));
+    }
+    Ok(eups_pathbuf_vec)
 }
 
 /// Returns the eups system path as determined from the EUPS_PATH environment variable.
@@ -68,8 +74,8 @@ pub fn get_eups_path_from_env() -> Vec<PathBuf> {
     crate::debug!("Found {} in environment variable", env_var);
     let system_paths_option = path_string_to_vec(env_var.as_str());
     match system_paths_option {
-        Some(system_paths) => system_paths,
-        None => {
+        Ok(system_paths) => system_paths,
+        Err(_) => {
             exit_with_message!("Problem loading eups paths from env");
         }
     }
