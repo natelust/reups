@@ -122,29 +122,35 @@ must be used to restore an environment, as shell environment variables are being
 extern crate reups_lib;
 
 use reups_lib as reups;
+use std::io::Write;
+
+fn handle_result(res: Result<(), String>) {
+    match res {
+        Ok(_) => (),
+        Err(msg) => {
+            std::io::stderr()
+                .write(msg.as_bytes())
+                .expect("Error writing error message");
+        }
+    };
+}
 
 fn main() {
     let args = reups::parse_args();
 
     match args.subcommand() {
-        ("setup", Some(m)) => {
-            reups::setup_command(m, &args);
-        }
+        ("setup", Some(m)) => handle_result(reups::setup_command(m, &args)),
         ("prep", Some(_)) => {
             println!("{}", reups::build_prep_string());
         }
-        ("list", Some(m)) => {
-            reups::list_command(m, &args);
-        }
+        ("list", Some(m)) => handle_result(reups::list_command(m, &args)),
         ("completions", Some(m)) => {
             reups::write_completions_stdout(m.value_of("shell").unwrap());
         }
         ("env", Some(m)) => {
             reups::env_command(m, &args);
         }
-        ("declare", Some(m)) => {
-            reups::declare_command(m, &args);
-        }
+        ("declare", Some(m)) => handle_result(reups::declare_command(m, &args)),
         _ => println!("{}", args.usage()),
     }
 }

@@ -5,6 +5,7 @@
 
 use crate::argparse;
 use crate::db;
+use crate::db::DBBuilderTrait;
 use fnv::{FnvHashMap, FnvHashSet};
 use std::env;
 
@@ -16,9 +17,13 @@ use std::env;
  * command line, packaged and sent here. The arguments are defined in the
  * argparse module.
  */
-pub fn list_command(sub_args: &argparse::ArgMatches, _main_args: &argparse::ArgMatches) {
-    let mut lister = ListImpl::new(sub_args, _main_args);
+pub fn list_command(
+    sub_args: &argparse::ArgMatches,
+    _main_args: &argparse::ArgMatches,
+) -> Result<(), String> {
+    let mut lister = ListImpl::new(sub_args, _main_args)?;
     lister.run();
+    Ok(())
 }
 
 /// This enum controls if the list command shows tags, versions, or both
@@ -51,26 +56,27 @@ impl<'a> ListImpl<'a> {
     fn new(
         sub_args: &'a argparse::ArgMatches<'a>,
         _main_args: &'a argparse::ArgMatches<'a>,
-    ) -> ListImpl<'a> {
+    ) -> Result<ListImpl<'a>, String> {
         // Here we will process any of the global arguments in the future but for now there is
         // nothing so we do nothing but create the database. The global arguments might affect
         // construction in the future
 
         // cheat and look at the sub_args here to see if all products are listing all products or not. If
         // not, dont preload tag files in the database as this will slow things down
-        let preload = if sub_args.is_present("product")
+        let db_builder = db::DBBuilder::new();
+        let db_builder = if !(sub_args.is_present("product")
             || sub_args.is_present("setup")
             || sub_args.is_present("tags")
             || sub_args.is_present("onlyTags")
             || sub_args.is_present("onlyVers")
-            || sub_args.is_present("sources")
+            || sub_args.is_present("sources"))
         {
-            None
-        } else {
             // Mark the database to preload all the tag files off disk
-            Some(db::DBLoadControl::Tags)
+            db_builder.set_load_control(db::DBLoadControl::Tags)
+        } else {
+            db_builder
         };
-        let db = db::DB::new(None, None, preload);
+        let db = db_builder.build()?;
         // get any products that are currently setup
         let (current_products, local_setups) = find_setup_products();
         // String to hold the output
@@ -78,7 +84,7 @@ impl<'a> ListImpl<'a> {
         // Hold tag information
         let tags = None;
         // create the object
-        ListImpl {
+        Ok(ListImpl {
             sub_args,
             _main_args,
             output_string,
@@ -86,7 +92,7 @@ impl<'a> ListImpl<'a> {
             local_setups,
             db,
             tags,
-        }
+        })
     }
 
     /// Runs the ListImpl over arguments given on the command line, and information

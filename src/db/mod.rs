@@ -69,11 +69,16 @@ pub enum DBLoadControl {
     All,
 }
 
+/// Creates a new DB object. Optionally takes the path to a system database, a user database,
+/// and where the products themselves are located. Another optional argument is a
+/// DBLoadControl, which specifies which products are to be preloaded from disk at database
+/// creation time. Set the option to None if no products are to be loaded
 pub struct DBBuilder {
     eups_env: bool,
     eups_user: bool,
     db_sources: FnvHashMap<String, PathBuf>,
     extra_id: u32,
+    load_control: Option<DBLoadControl>,
 }
 
 type BuildBundle = Result<DBBuilder, String>;
@@ -85,6 +90,7 @@ impl DBBuilder {
             eups_user: true,
             db_sources: FnvHashMap::default(),
             extra_id: 0,
+            load_control: Some(DBLoadControl::All),
         })
     }
 }
@@ -95,6 +101,7 @@ pub trait DBBuilderTrait {
     fn add_path_str(self, path_str: &str) -> BuildBundle;
     fn add_path_vec(self, path_vec: Vec<PathBuf>) -> BuildBundle;
     fn add_path(self, pth: PathBuf) -> BuildBundle;
+    fn set_load_control(self, mode: DBLoadControl) -> BuildBundle;
     fn build(self) -> Result<DB, String>;
 }
 
@@ -113,9 +120,7 @@ impl DBBuilderTrait for BuildBundle {
 
     fn add_path_str(self, path_str: &str) -> BuildBundle {
         match cogs::path_string_to_vec(path_str) {
-            Ok(path_vec) => {
-                self.add_path_vec(path_vec)
-            }
+            Ok(path_vec) => self.add_path_vec(path_vec),
             Err(msg) => Err(msg),
         }
     }
@@ -135,45 +140,73 @@ impl DBBuilderTrait for BuildBundle {
         Ok(me)
     }
 
+    fn set_load_control(self, mode: DBLoadControl) -> BuildBundle {
+        let mut me = self?;
+        me.load_control = Some(mode);
+        Ok(me)
+    }
+
     fn build(self) -> Result<DB, String> {
-        let mut db_dict = FnvHashMap::default();
+        let mut db_dict = FnvHashMap::<String, Box<db_impl::DBImpl<table::Table>>>::default();
         let me = self?;
-        let me = if me.eups_env == true {
+        if me.eups_env {
             let eups_env_path = cogs::get_eups_path_from_env();
             for pth in eups_env_path.iter() {
-            crate::debug!(
-                "Adding {} to databases",
-                pth.to_str().expect("Malformed database string")
-            );
-            let temp_db = match db_impl::PosixDBImpl::new(pth.clone(), preload.as_ref(), None) {
-                Ok(x) => x,
-                Err(msg) => {
-                    return Err(msg)
-                }
-            };
-            // expect should be safe here, as we pushed a directory on previously
-            // Format the database map name in a deterministic way with the last bit of the path
-            let db_name = format!(
-                "posix_system_{}",
-                path.parent()
-                    .expect("Problem with database path after stripping off upd_db")
-                    .file_name()
-                    .expect("There was a problem getting the final directory in database path")
-                    .to_str()
-                    .expect("Problem turning directory osString to str")
-            );
-            db_dict.insert(db_name.clone(), Box::new(temp_db));
-            database_names.push(db_name);
-
-            Ok(me).add_path_vec(eups_env_path)
+                crate::debug!(
+                    "Adding {} to databases",
+                    pth.to_str().expect("Malformed database string")
+                );
+                let temp_db =
+                    match db_impl::PosixDBImpl::new(pth.clone(), me.load_control.as_ref(), None) {
+                        Ok(x) => x,
+                        Err(msg) => return Err(msg),
+                    };
+                // expect should be safe here, as we pushed a directory on previously
+                // Format the database map name in a deterministic way with the last bit of the path
+                let db_name = format!(
+                    "posix_system_{}",
+                    pth.parent()
+                        .expect("Problem with database path after stripping off upd_db")
+                        .file_name()
+                        .expect("There was a problem getting the final directory in database path")
+                        .to_str()
+                        .expect("Problem turning directory osString to str")
+                );
+                db_dict.insert(db_name.clone(), Box::new(temp_db));
             }
         };
-        let me = if (me.eups_user) {
+        // Handle the user paths
+        if me.eups_user {
             let eups_user_path = cogs::get_user_path_from_home();
             if eups_user_path.is_some() {
-                Ok(me).add_path_vec(vec![eups_user_path])
+                let pth = eups_user_path.unwrap();
+                crate::debug!(
+                    "Adding {} to databases",
+                    pth.clone().to_str().expect("Malformed database string")
+                );
+                let user_db = match db_impl::PosixDBImpl::new(pth, me.load_control.as_ref(), None) {
+                    Ok(x) => x,
+                    Err(msg) => return Err(msg),
+                };
+                let database_name = String::from("posix_user");
+                db_dict.insert(database_name.clone(), Box::new(user_db));
             }
+        };
+        // Handle any other paths that were added
+        for (name, pth) in me.db_sources.iter() {
+            let extra_db =
+                match db_impl::PosixDBImpl::new(pth.clone(), me.load_control.as_ref(), None) {
+                    Ok(x) => x,
+                    Err(msg) => return Err(msg),
+                };
+            db_dict.insert(name.clone(), Box::new(extra_db));
         }
+        let db_names: Vec<String> = db_dict.keys().map(|x| x.clone()).collect();
+        Ok(DB {
+            database_map: db_dict,
+            database_names: db_names,
+            cache: RefCell::new(FnvHashMap::default()),
+        })
     }
 }
 
@@ -197,109 +230,6 @@ impl fmt::Debug for DB {
 }
 
 impl DB {
-    /// Creates a new DB object. Optionally takes the path to a system database, a user database,
-    /// and where the products themselves are located. Another optional argument is a
-    /// DBLoadControl, which specifies which products are to be preloaded from disk at database
-    /// creation time. Set the option to None if no products are to be loaded
-    /// and
-    pub fn new(
-        db_path: Option<&str>,
-        user_tag_root: Option<&str>,
-        preload: Option<DBLoadControl>,
-    ) -> DB {
-        // Create a db hashmap
-        let mut database_map = FnvHashMap::<String, Box<db_impl::DBImpl<table::Table>>>::default();
-        // Create a list of db names to maintain insertion order
-        let mut database_names = vec![];
-
-        // Check to see if a path was passed into the db builder, else get the
-        // eups system variable
-        let eups_paths = match db_path {
-            Some(path) => {
-                let paths = cogs::path_string_to_vec(path);
-                match paths {
-                    Ok(split_paths) => split_paths,
-                    _ => {
-                        exit_with_message!(format!("Cannot parse {} into system paths", path));
-                    }
-                }
-            }
-            None => cogs::get_eups_path_from_env(),
-        };
-        for path in eups_paths.iter() {
-            crate::debug!(
-                "Adding {} to databases",
-                path.to_str().expect("Malformed database string")
-            );
-            let temp_db = match db_impl::PosixDBImpl::new(path.clone(), preload.as_ref(), None) {
-                Ok(x) => x,
-                Err(msg) => {
-                    exit_with_message!(msg);
-                }
-            };
-            // expect should be safe here, as we pushed a directory on previously
-            // Format the database map name in a deterministic way with the last bit of the path
-            let db_name = format!(
-                "posix_system_{}",
-                path.parent()
-                    .expect("Problem with database path after stripping off upd_db")
-                    .file_name()
-                    .expect("There was a problem getting the final directory in database path")
-                    .to_str()
-                    .expect("Problem turning directory osString to str")
-            );
-            database_map.insert(db_name.clone(), Box::new(temp_db));
-            database_names.push(db_name);
-        }
-
-        // Check if a user directory was supplied, if so implement a db, if not try to get a default, else record None
-        let user_db_path = match user_tag_root {
-            Some(user_path) => {
-                let user_pathbuf = PathBuf::from(user_path);
-                if !user_pathbuf.is_dir() {
-                    exit_with_message!(format!(
-                        "The supplied user database {} is not a vailid path",
-                        user_pathbuf
-                            .to_str()
-                            .expect("The user_path string is invalid")
-                    ));
-                }
-                Some(user_pathbuf)
-            }
-            None => cogs::get_user_path_from_home(),
-        };
-
-        if user_db_path.is_some() {
-            crate::debug!(
-                "Adding {} to databases",
-                user_db_path
-                    .clone()
-                    .unwrap()
-                    .to_str()
-                    .expect("Malformed database string")
-            );
-            let user_db =
-                match db_impl::PosixDBImpl::new(user_db_path.unwrap(), preload.as_ref(), None) {
-                    Ok(x) => x,
-                    Err(msg) => {
-                        exit_with_message!(msg);
-                    }
-                };
-            let database_name = String::from("posix_user");
-            database_map.insert(database_name.clone(), Box::new(user_db));
-            database_names.push(database_name);
-        }
-
-        let cache = RefCell::new(FnvHashMap::default());
-
-        // Construct and return the database struct
-        DB {
-            database_map,
-            database_names,
-            cache,
-        }
-    }
-
     /// Returns a vector containing the names of all the products that are known to the database.
     pub fn get_all_products(&self) -> Vec<&str> {
         // iterate over all dbs, getting a vector of keys of products, and append them to one

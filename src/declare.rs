@@ -11,10 +11,14 @@
 use crate::argparse;
 use crate::cogs;
 use crate::db;
+use crate::db::DBBuilderTrait;
 use crate::logger;
 use std::path::PathBuf;
 
-pub fn declare_command(sub_args: &argparse::ArgMatches, _main_args: &argparse::ArgMatches) {
+pub fn declare_command(
+    sub_args: &argparse::ArgMatches,
+    _main_args: &argparse::ArgMatches,
+) -> Result<(), String> {
     let mut declare_command = DeclareCommandImpl::new(sub_args, _main_args);
     declare_command.run()
 }
@@ -36,7 +40,7 @@ impl<'a> DeclareCommandImpl<'a> {
         }
     }
 
-    fn run(&mut self) {
+    fn run(&mut self) -> Result<(), String> {
         let prod_path_string = self.sub_args.value_of("path").unwrap();
         let prod_path = PathBuf::from(prod_path_string);
         if !prod_path.exists() {
@@ -81,7 +85,7 @@ impl<'a> DeclareCommandImpl<'a> {
             table,
         };
 
-        let db = db::DB::new(None, None, None);
+        let db = db::DBBuilder::new().build()?;
         let result = db.declare(vec![input], source);
         use db::DeclareResults::*;
         match result {
@@ -103,5 +107,6 @@ impl<'a> DeclareCommandImpl<'a> {
                 crate::info!("Wrote declared product {} to source {}", product, name);
             }
         }
+        Ok(())
     }
 }

@@ -17,6 +17,7 @@ use std::path::PathBuf;
 use crate::argparse;
 use crate::cogs;
 use crate::db;
+use crate::db::DBBuilderTrait;
 use crate::logger;
 use crate::table;
 
@@ -268,12 +269,15 @@ fn get_command_string() -> String {
  * containing all the environment variables to be setup. To actually have the variables added to
  * the environment, this command must be used in combination with the rsetup shell function.
  */
-pub fn setup_command(sub_args: &argparse::ArgMatches, _main_args: &argparse::ArgMatches) {
+pub fn setup_command(
+    sub_args: &argparse::ArgMatches,
+    _main_args: &argparse::ArgMatches,
+) -> Result<(), String> {
     // Here we will process any of the global arguments in the future but for now there is
     // nothing so we do nothing but create the database. The global arguments might affect
     // construction in the future
     logger::build_logger(sub_args, true);
-    let db = db::DB::new(None, None, None);
+    let db = db::DBBuilder::new().build()?;
 
     // We process local arguments here to set the state that will be used to setup a product
     // Create a vector for the tags to consider
@@ -455,8 +459,10 @@ pub fn setup_command(sub_args: &argparse::ArgMatches, _main_args: &argparse::Arg
         }
         println!("{}", return_string);
     } else {
-        exit_with_message!(
+        return Err(
             "Error, no product to setup, please specify product or path to table with -r"
+                .to_string(),
         );
     }
+    Ok(())
 }
