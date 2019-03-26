@@ -212,6 +212,14 @@ impl<'a> ListImpl<'a> {
                             }
                         }
                     }
+                    // need to look for versions with no tag
+                    for vers in self.db.product_versions(product).iter() {
+                        if !version_to_tags.contains_key(vers) {
+                            version_to_tags
+                                .entry(vers)
+                                .or_insert(Vec::<&str>::default());
+                        }
+                    }
                 }
                 // look for any local version that might be setup
                 if let Some(local) = self.local_setups.get(product) {
