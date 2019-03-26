@@ -504,9 +504,9 @@ impl DB {
         crate::debug!("Adding input into database source {}", source_name);
         let new_result = active_db.declare(&inputs);
         match new_result {
-            Err(new) => {
+            Err((new, msg)) => {
                 this.database_map.insert(source_name.clone(), new);
-                return DeclareResults::Error(this, source_name);
+                return DeclareResults::Error(this, source_name, msg);
             }
             Ok(new) => {
                 this.database_map.insert(source_name.clone(), new);
@@ -520,6 +520,6 @@ pub enum DeclareResults {
     MultipleWriteable(DB),
     NoneWritable(DB),
     Success(DB, String),
-    Error(DB, String),
+    Error(DB, String, String),
     NoSource(DB),
 }

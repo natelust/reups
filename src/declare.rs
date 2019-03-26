@@ -97,11 +97,11 @@ impl<'a> DeclareCommandImpl<'a> {
             }
             MultipleWriteable(_) => {
                 exit_with_message!(
-                    "More than one writeable db found, specify source with --source"
+                    "More than one writable db found, specify source with --source"
                 );
             }
-            Error(_, name) => {
-                exit_with_message!(format!("Problem declaring to {}, check that version, and optionally tag and ident are not already declared", name));
+            Error(_, name, msg) => {
+                exit_with_message!(format!("Problem declaring to {}, check that version, and optionally tag and ident are not already declared. Error message: {}", name, msg));
             }
             Success(_, name) => {
                 crate::info!("Wrote declared product {} to source {}", product, name);

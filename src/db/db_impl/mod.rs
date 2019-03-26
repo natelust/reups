@@ -38,22 +38,22 @@ pub trait DBImpl<T> {
 }
 
 pub trait DBImplDeclare: Sized {
-    fn declare(self, inputs: &Vec<DeclareInputs>) -> Result<Self, Self>;
-    fn declare_in_memory(self, inputs: &Vec<DeclareInputs>) -> Result<Self, Self>;
+    fn declare(self, inputs: &Vec<DeclareInputs>) -> Result<Self, (Self, String)>;
+    fn declare_in_memory(self, inputs: &Vec<DeclareInputs>) -> Result<Self, (Self, String)>;
 }
 
 impl DBImplDeclare for Box<dyn DBImpl<Table>> {
-    fn declare_in_memory(mut self, inputs: &Vec<DeclareInputs>) -> Result<Self, Self> {
+    fn declare_in_memory(mut self, inputs: &Vec<DeclareInputs>) -> Result<Self, (Self, String)> {
         let result = self.declare_in_memory_impl(inputs);
-        if result.is_err() {
-            return Err(self) 
+        match result {
+            Err(msg) => Err((self, msg)),
+            Ok(_) => Ok(self),
         }
-        Ok(self)
     }
-    fn declare(mut self, inputs: &Vec<DeclareInputs>) -> Result<Self, Self> {
+    fn declare(mut self, inputs: &Vec<DeclareInputs>) -> Result<Self, (Self, String)> {
         let result = self.declare_in_memory_impl(inputs);
-        if result.is_err() {
-            return Err(self)
+        if let Err(msg) = result {
+            return Err((self, msg));
         }
         for input in inputs.iter() {
             crate::debug!("Syncing input product {}", input.product);
