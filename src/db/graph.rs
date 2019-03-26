@@ -192,11 +192,13 @@ impl<'a> Graph<'a> {
         // This means that there are no dependencies of the required type, and so the function
         // should return.
         if let None = dependencies {
+            crate::debug!("No dependencies found for {}", top);
             return;
         }
         // If there are dependencies for the version type, loop over the required and optional
         // dependencies
         let dep_unwrap = dependencies.unwrap();
+        crate::debug!("{} has dependencies of {:?}", top, dep_unwrap);
         for (dep_vec, node_type) in vec![&dep_unwrap.required, &dep_unwrap.optional]
             .iter()
             .zip(vec![NodeType::Required, NodeType::Optional])
