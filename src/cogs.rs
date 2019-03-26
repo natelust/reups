@@ -55,7 +55,7 @@ pub fn path_string_to_vec(path_string: &str) -> Result<Vec<PathBuf>, String> {
         .collect();
     if eups_path_vec.len() != eups_pathbuf_vec.len() {
         return Err(format!(
-            "One of the paths specified in {} is not a valid db",
+            "One of the paths specified in {} is not a valid db\n",
             path_string
         ));
     }
