@@ -63,7 +63,7 @@ impl<'a> ListImpl<'a> {
 
         // cheat and look at the sub_args here to see if all products are listing all products or not. If
         // not, dont preload tag files in the database as this will slow things down
-        let db_builder = db::DBBuilder::new();
+        let db_builder = db::DBBuilder::from_args(sub_args);
         let db_builder = if !(sub_args.is_present("product")
             || sub_args.is_present("setup")
             || sub_args.is_present("tags")

@@ -277,7 +277,7 @@ pub fn setup_command(
     // nothing so we do nothing but create the database. The global arguments might affect
     // construction in the future
     logger::build_logger(sub_args, true);
-    let db = db::DBBuilder::new().build()?;
+    let db = db::DBBuilder::from_args(sub_args).build()?;
 
     // We process local arguments here to set the state that will be used to setup a product
     // Create a vector for the tags to consider

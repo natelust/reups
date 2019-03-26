@@ -15,6 +15,7 @@ pub mod graph;
 pub mod table;
 
 use self::dbfile::DBFile;
+use crate::argparse;
 use crate::cogs;
 
 use self::db_impl::DBImplDeclare;
@@ -92,6 +93,20 @@ impl DBBuilder {
             extra_id: 0,
             load_control: Some(DBLoadControl::All),
         })
+    }
+
+    pub fn from_args(args: &argparse::ArgMatches) -> BuildBundle {
+        let mut db = DBBuilder::new();
+        if args.is_present("nouser") {
+            db = db.add_eups_user(false);
+        }
+        if args.is_present("nosys") {
+            db = db.add_eups_env(false);
+        }
+        if args.is_present("database") {
+            db = db.add_path_str(args.value_of("database").unwrap());
+        }
+        db
     }
 }
 

@@ -85,7 +85,7 @@ impl<'a> DeclareCommandImpl<'a> {
             table,
         };
 
-        let db = db::DBBuilder::new().build()?;
+        let db = db::DBBuilder::from_args(self.sub_args).build()?;
         let result = db.declare(vec![input], source);
         use db::DeclareResults::*;
         match result {
