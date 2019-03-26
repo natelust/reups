@@ -18,9 +18,9 @@ use std::path;
 lazy_static::lazy_static! {
     // Regexes to capture information out of the text of a table file
     // captures exact dependency trees
-    static ref EXACT: Regex = Regex::new(r"[^#]\b(?P<type>setup(Optional|Required))[(](?P<product>[[:word:]]+?\b)\s+[-]j\s(?P<version>\S+?\b)[)]").unwrap();
+    static ref EXACT: Regex = Regex::new(r"(?m)^[^#](?P<type>etup(Optional|Required))[(](?P<product>[[:word:]]+?\b)\s+[-]j\s(?P<version>\S+?\b)[)]").unwrap();
     // captures inexact dependency trees
-    static ref INEXACT: Regex = Regex::new(r"[^#]\b(?P<type>setup(Optional|Required))[(](?P<product>[[:word:]]+?\b)(?:\s(?P<version>\S+?\b)\s\[)?").unwrap();
+    static ref INEXACT: Regex = Regex::new(r"(?m)^[^#](?P<type>etup(Optional|Required))[(](?P<product>[[:word:]]+?\b)(?:\s(?P<version>\S+?\b)\s\[)?").unwrap();
 
 
     // Finds variables to be prepended to an environment variable
@@ -85,8 +85,14 @@ impl Table {
         // defined as statics because they will remain between different tables
         // being created
         let exact = Table::extract_setup(contents.as_str(), &*EXACT);
+        crate::debug!("Table for {} contains exact dependencies {:?}", name, exact);
         // Get the inexact mapping
         let inexact = Table::extract_setup(contents.as_str(), &*INEXACT);
+        crate::debug!(
+            "Table for {} contains inexact dependencies {:?}",
+            name,
+            inexact
+        );
         let mut env_var = FnvHashMap::default();
         let env_re_vec: Vec<&Regex> = vec![&*ENV_PREPEND, &*ENV_APPEND];
         for (re, action) in env_re_vec
@@ -123,10 +129,12 @@ impl Table {
                 Some(ver) => ver.as_str(),
                 None => "",
             };
-            if option_type == "setupRequired" {
+            // These are not missing the s character, the regex matches against not #
+            // which catches the first s
+            if option_type == "etupRequired" {
                 required_map.insert(String::from(prod), String::from(vers));
             }
-            if option_type == "setupOptional" {
+            if option_type == "etupOptional" {
                 optional_map.insert(String::from(prod), String::from(vers));
             }
         }
