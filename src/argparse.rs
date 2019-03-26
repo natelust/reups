@@ -46,13 +46,6 @@ pub fn build_setup<'a, 'b>() -> App<'a, 'b> {
                 .help("Run setup with Inexact versions as specified in the table files")
                 .short("E")
                 .long("inexact"),
-        )
-        .arg(
-            Arg::with_name("verbose")
-                .short("v")
-                .long("verbose")
-                .multiple(true)
-                .help("Sets the level of verbosity, multiple occurances increases verbosity"),
         );
 }
 
@@ -126,13 +119,6 @@ fn build_env<'a, 'b>() -> App<'a, 'b> {
             Arg::with_name("name")
                 .required(false)
                 .help("Optional name to save/restore"),
-        )
-        .arg(
-            Arg::with_name("verbose")
-                .short("v")
-                .long("verbose")
-                .multiple(true)
-                .help("Sets the level of verbosity, multiple occurances increases verbosity"),
         );
 }
 
@@ -181,13 +167,6 @@ fn build_declare<'a, 'b>() -> App<'a, 'b> {
                 .help("Unique identifier to assign to product")
                 .long("ident")
                 .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("verbose")
-                .short("v")
-                .long("verbose")
-                .multiple(true)
-                .help("Sets the level of verbosity, multiple occurances increases verbosity"),
         );
 }
 
@@ -209,6 +188,36 @@ pub fn build_cli() -> App<'static, 'static> {
         .author("Nate Lust")
         .about("Dynamic environment management")
         .version(clap::crate_version!())
+        .arg(
+            Arg::with_name("verbose")
+                .global(true)
+                .short("v")
+                .long("verbose")
+                .multiple(true)
+                .help("Sets the level of verbosity, multiple occurances increases verbosity"),
+        )
+        .arg(
+            Arg::with_name("database")
+                .global(true)
+                .short("Z")
+                .long("database")
+                .takes_value(true)
+                .help("Colon-separated list of paths to database to use"),
+        )
+        .arg(
+            Arg::with_name("nouser")
+                .global(true)
+                .short("U")
+                .long("nouser")
+                .help("Disable loading database from standard user locations"),
+        )
+        .arg(
+            Arg::with_name("nosys")
+                .global(true)
+                .short("S")
+                .long("nosys")
+                .help("Disable loading database found in system environment variables"),
+        )
         .subcommand(build_setup())
         .subcommand(build_prep())
         .subcommand(build_list())
