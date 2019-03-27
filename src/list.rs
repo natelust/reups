@@ -17,11 +17,14 @@ use std::env;
  * command line, packaged and sent here. The arguments are defined in the
  * argparse module.
  */
-pub fn list_command(
+use std::io::Write;
+
+pub fn list_command<W: Write>(
     sub_args: &argparse::ArgMatches,
     _main_args: &argparse::ArgMatches,
+    writer: W,
 ) -> Result<(), String> {
-    let mut lister = ListImpl::new(sub_args, _main_args)?;
+    let mut lister = ListImpl::new(sub_args, _main_args, writer)?;
     lister.run();
     Ok(())
 }
@@ -40,7 +43,7 @@ enum OnlyPrint {
  * prepopulates the database and some system variables. The sub command is executed with the run
  * command.
  */
-struct ListImpl<'a> {
+struct ListImpl<'a, W: Write> {
     sub_args: &'a argparse::ArgMatches<'a>,
     _main_args: &'a argparse::ArgMatches<'a>,
     output_string: String,
@@ -48,15 +51,17 @@ struct ListImpl<'a> {
     local_setups: FnvHashMap<String, String>,
     db: db::DB,
     tags: Option<Vec<String>>,
+    writer: W,
 }
 
-impl<'a> ListImpl<'a> {
+impl<'a, W: Write> ListImpl<'a, W> {
     /** Creates a LIstImpl struct given argument matches from the command line
      */
     fn new(
         sub_args: &'a argparse::ArgMatches<'a>,
         _main_args: &'a argparse::ArgMatches<'a>,
-    ) -> Result<ListImpl<'a>, String> {
+        writer: W,
+    ) -> Result<ListImpl<'a, W>, String> {
         // Here we will process any of the global arguments in the future but for now there is
         // nothing so we do nothing but create the database. The global arguments might affect
         // construction in the future
@@ -92,6 +97,7 @@ impl<'a> ListImpl<'a> {
             local_setups,
             db,
             tags,
+            writer,
         })
     }
 
@@ -104,7 +110,9 @@ impl<'a> ListImpl<'a> {
         } else {
             self.run_product();
         }
-        println!("{}", self.output_string.trim_end_matches("\n"));
+        let _ = self
+            .writer
+            .write(format!("{}\n", self.output_string.trim_end_matches("\n")).as_bytes());
     }
 
     fn run_sources(&mut self) {
@@ -338,7 +346,7 @@ fn find_setup_products() -> (FnvHashSet<(String, String)>, FnvHashMap<String, St
             if value_vec.len() < 2 {
                 // The value corresponding to a setup product should at least have
                 // a Name and a version, if not there was an issue with that variable
-                eprintln!("Warning, problem parsing {} skipping", var);
+                crate::warn!("Warning, problem parsing {} skipping", var);
                 continue;
             }
             // the first element is the product that is setup, the second is version

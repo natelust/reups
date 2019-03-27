@@ -12,6 +12,7 @@ use fnv::FnvHashMap;
 
 use std::env;
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 
 use crate::argparse;
@@ -269,14 +270,15 @@ fn get_command_string() -> String {
  * containing all the environment variables to be setup. To actually have the variables added to
  * the environment, this command must be used in combination with the rsetup shell function.
  */
-pub fn setup_command(
+pub fn setup_command<W: Write>(
     sub_args: &argparse::ArgMatches,
     _main_args: &argparse::ArgMatches,
+    writer: W,
 ) -> Result<(), String> {
     // Here we will process any of the global arguments in the future but for now there is
     // nothing so we do nothing but create the database. The global arguments might affect
     // construction in the future
-    logger::build_logger(sub_args, true);
+    logger::build_logger(sub_args, std::io::stderr());
     let db = db::DBBuilder::from_args(sub_args).build()?;
 
     // We process local arguments here to set the state that will be used to setup a product
@@ -457,7 +459,8 @@ pub fn setup_command(
             return_string.push_str([k, v].join("=").as_str());
             return_string.push_str(" ");
         }
-        println!("{}", return_string);
+        let mut writer = writer;
+        let _ = writer.write(format!("{}\n", return_string).as_bytes());
     } else {
         return Err(
             "Error, no product to setup, please specify product or path to table with -r"

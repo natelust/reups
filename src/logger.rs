@@ -6,39 +6,37 @@
 use crate::argparse;
 use log;
 use std::boxed::Box;
+use std::io::Write;
+use std::sync::Mutex;
 
 /// Structure which is responsible processing input from the std log
-/// api. It's members are the highest log level to output, and if
-/// the output should be sent to stdandard error instead of standard out.
-pub struct Logger {
+/// api. It's members are the highest log level to output, and what
+/// writer object that the logger should write out to.
+pub struct Logger<W: Write> {
     log_level: log::LevelFilter,
-    stderr: bool,
+    writer: Mutex<W>,
 }
 
-impl Logger {
+impl<W: Write> Logger<W> {
     /// Creates a new logger object. Arguments are the maximum level to log,
     /// and if the output should go to standard out or standard error.
-    pub fn new(log_level: log::LevelFilter, stderr: bool) -> Box<Logger> {
-        Box::new(Logger { log_level, stderr })
+    pub fn new(log_level: log::LevelFilter, writer: W) -> Box<Logger<W>> {
+        Box::new(Logger {
+            log_level,
+            writer: Mutex::new(writer),
+        })
     }
 }
 
-impl log::Log for Logger {
+impl<W: Write + Send + Sync> log::Log for Logger<W> {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
         metadata.level() <= self.log_level
     }
 
     fn log(&self, record: &log::Record) {
         if self.enabled(record.metadata()) {
-            let message = format!("{}: {}", record.level(), record.args());
-            match self.stderr {
-                true => {
-                    eprintln!("{}", message);
-                }
-                false => {
-                    println!("{}", message);
-                }
-            }
+            let message = format!("{}: {}\n", record.level(), record.args());
+            let _ = self.writer.lock().unwrap().write(message.as_bytes());
         }
     }
 
@@ -48,13 +46,13 @@ impl log::Log for Logger {
 /// Builds and initializes a logging object with options from the command line
 /// and the stderr boolean which is governed by the context of the subcommand
 /// that initiates the logger.
-pub fn build_logger(args: &argparse::ArgMatches, stderr: bool) {
+pub fn build_logger<W: Write + Sync + Send + 'static>(args: &argparse::ArgMatches, writer: W) {
     let level = match args.occurrences_of("verbose") {
         0 => log::LevelFilter::Warn,
         1 => log::LevelFilter::Info,
         2 => log::LevelFilter::Debug,
         _ => log::LevelFilter::Trace,
     };
-    log::set_boxed_logger(Logger::new(level, stderr)).unwrap();
+    log::set_boxed_logger(Logger::new(level, writer)).unwrap();
     log::set_max_level(level)
 }

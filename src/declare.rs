@@ -33,7 +33,7 @@ impl<'a> DeclareCommandImpl<'a> {
         sub_args: &'a argparse::ArgMatches<'a>,
         _main_args: &'a argparse::ArgMatches<'a>,
     ) -> DeclareCommandImpl<'a> {
-        logger::build_logger(sub_args, false);
+        logger::build_logger(sub_args, std::io::stdout());
         DeclareCommandImpl {
             sub_args,
             _main_args,
@@ -96,9 +96,7 @@ impl<'a> DeclareCommandImpl<'a> {
                 exit_with_message!("No writable source found");
             }
             MultipleWriteable(_) => {
-                exit_with_message!(
-                    "More than one writable db found, specify source with --source"
-                );
+                exit_with_message!("More than one writable db found, specify source with --source");
             }
             Error(_, name, msg) => {
                 exit_with_message!(format!("Problem declaring to {}, check that version, and optionally tag and ident are not already declared. Error message: {}", name, msg));

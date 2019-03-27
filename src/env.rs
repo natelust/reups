@@ -20,7 +20,7 @@ use crate::logger;
 use preferences;
 use preferences::Preferences;
 use std::env as stdEnv;
-use std::io::stdin;
+use std::io::{stdin, Write};
 
 // This is the information used to differentiate this application to the preferences crate and is
 // used to determine what path the settings will be saved to.
@@ -49,23 +49,28 @@ const PREF_KEY: &str = "saved/environments";
  * * _main_args - Arguments matched from the command line to the main reups executable,
  *                global arguments
  **/
-pub fn env_command(sub_args: &argparse::ArgMatches, _main_args: &argparse::ArgMatches) {
-    let mut env_command = EnvCommandImpl::new(sub_args, _main_args);
+pub fn env_command<W: Write>(
+    sub_args: &argparse::ArgMatches,
+    _main_args: &argparse::ArgMatches,
+    writer: W,
+) {
+    let mut env_command = EnvCommandImpl::new(sub_args, _main_args, writer);
     env_command.run();
 }
 
 /**
  * This is the internal implementation of the env sub command
  */
-struct EnvCommandImpl<'a> {
+struct EnvCommandImpl<'a, W: Write> {
     sub_args: &'a argparse::ArgMatches<'a>,
     _main_args: &'a argparse::ArgMatches<'a>,
     current_commands: Vec<String>,
     name: String,
     saved_envs: preferences::PreferencesMap<Vec<String>>,
+    writer: W,
 }
 
-impl<'a> EnvCommandImpl<'a> {
+impl<'a, W: Write> EnvCommandImpl<'a, W> {
     /**
      * Creates a new EnvCommandImpl. The function uses the supplied argument matches, looks up the
      * commands that were executed in the current environment, parses the name to use in
@@ -75,9 +80,10 @@ impl<'a> EnvCommandImpl<'a> {
     fn new(
         sub_args: &'a argparse::ArgMatches<'a>,
         _main_args: &'a argparse::ArgMatches<'a>,
-    ) -> EnvCommandImpl<'a> {
+        writer: W,
+    ) -> EnvCommandImpl<'a, W> {
         // make a logger object
-        logger::build_logger(sub_args, false);
+        logger::build_logger(sub_args, std::io::stdout());
         // Get the environment variable
         let current_commands = match stdEnv::var("REUPS_HISTORY") {
             Ok(existing) => existing.split("|").map(|x| String::from(x)).collect(),
@@ -130,6 +136,7 @@ impl<'a> EnvCommandImpl<'a> {
             current_commands,
             name,
             saved_envs: saved_envs,
+            writer,
         }
     }
 
@@ -160,7 +167,7 @@ impl<'a> EnvCommandImpl<'a> {
      * shell function provided by reups prep. Direct invocation is most likely only for debug
      * reasons. This is a limitation of modifying shell environments.
      **/
-    fn run_restore(&self) {
+    fn run_restore(&mut self) {
         // get env to restore from the supplied name
         let env_list_option = &self.saved_envs.get(&self.name);
         // Verify the environment could be found, otherwise exit
@@ -182,7 +189,9 @@ impl<'a> EnvCommandImpl<'a> {
             let args = app.clone().get_matches_from(command.split(" "));
             match args.subcommand() {
                 ("setup", Some(_)) => {
-                    println!("eval $({});", command);
+                    let _ = self
+                        .writer
+                        .write(format!("eval $({});\n", command).as_bytes());
                 }
                 _ => {
                     exit_with_message!(format!("Problem restoring environment {}", &self.name));
@@ -209,10 +218,10 @@ impl<'a> EnvCommandImpl<'a> {
 
     /** This function will list all named environments that have been saved in the past
      */
-    fn run_list(&self) {
-        println!("Environments Found:");
+    fn run_list(&mut self) {
+        let _ = self.writer.write(b"Environments Found:\n");
         for (k, v) in &self.saved_envs {
-            println!("{}", k);
+            let _ = self.writer.write(format!("{}\n", k).as_bytes());
             crate::info!("{:?}", v);
         }
     }
