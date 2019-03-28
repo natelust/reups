@@ -20,7 +20,7 @@ lazy_static::lazy_static! {
     // captures exact dependency trees
     static ref EXACT: Regex = Regex::new(r"(?m)^\s*[^#](?P<type>etup(Optional|Required))[(](?P<product>[[:word:]]+?\b)\s+[-]j\s(?P<version>\S+?\b)[)]").unwrap();
     // captures inexact dependency trees
-    static ref INEXACT: Regex = Regex::new(r"(?m)^\s*[^#](?P<type>etup(Optional|Required))[(](?P<product>[[:word:]]+?\b)(?:\s(?P<version>\S+?\b)\s\[)?").unwrap();
+    static ref INEXACT: Regex = Regex::new(r"(?m)^\s*[^#](?P<type>etup(Optional|Required))[(](?P<product>[[:word:]]+?\b)(?:\s(?P<version>\S+?\b)\s\[?)?").unwrap();
 
 
     // Finds variables to be prepended to an environment variable
