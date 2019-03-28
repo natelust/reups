@@ -139,16 +139,16 @@ fn main() {
     let args = reups::parse_args();
 
     match args.subcommand() {
-        ("setup", Some(m)) => handle_result(reups::setup_command(m, &args, std::io::stdout())),
+        ("setup", Some(m)) => handle_result(reups::setup_command(m, &args, &mut std::io::stdout())),
         ("prep", Some(_)) => {
             println!("{}", reups::build_prep_string());
         }
-        ("list", Some(m)) => handle_result(reups::list_command(m, &args, std::io::stdout())),
+        ("list", Some(m)) => handle_result(reups::list_command(m, &args, &mut std::io::stdout())),
         ("completions", Some(m)) => {
             reups::write_completions_stdout(m.value_of("shell").unwrap());
         }
         ("env", Some(m)) => {
-            reups::env_command(m, &args, std::io::stdout());
+            reups::env_command(m, &args, & mut std::io::stdout());
         }
         ("declare", Some(m)) => handle_result(reups::declare_command(m, &args)),
         _ => println!("{}", args.usage()),

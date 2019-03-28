@@ -53,6 +53,7 @@ pub fn build_logger<W: Write + Sync + Send + 'static>(args: &argparse::ArgMatche
         2 => log::LevelFilter::Debug,
         _ => log::LevelFilter::Trace,
     };
-    log::set_boxed_logger(Logger::new(level, writer)).unwrap();
+    let logger = Logger::new(level, writer);
+    let _output = log::set_boxed_logger(logger);
     log::set_max_level(level)
 }

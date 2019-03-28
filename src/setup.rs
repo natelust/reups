@@ -273,7 +273,7 @@ fn get_command_string() -> String {
 pub fn setup_command<W: Write>(
     sub_args: &argparse::ArgMatches,
     _main_args: &argparse::ArgMatches,
-    writer: W,
+    writer: &mut W,
 ) -> Result<(), String> {
     // Here we will process any of the global arguments in the future but for now there is
     // nothing so we do nothing but create the database. The global arguments might affect
@@ -459,7 +459,6 @@ pub fn setup_command<W: Write>(
             return_string.push_str([k, v].join("=").as_str());
             return_string.push_str(" ");
         }
-        let mut writer = writer;
         let _ = writer.write(format!("{}\n", return_string).as_bytes());
     } else {
         return Err(

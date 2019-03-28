@@ -52,7 +52,7 @@ const PREF_KEY: &str = "saved/environments";
 pub fn env_command<W: Write>(
     sub_args: &argparse::ArgMatches,
     _main_args: &argparse::ArgMatches,
-    writer: W,
+    writer: &mut W,
 ) {
     let mut env_command = EnvCommandImpl::new(sub_args, _main_args, writer);
     env_command.run();
@@ -67,7 +67,7 @@ struct EnvCommandImpl<'a, W: Write> {
     current_commands: Vec<String>,
     name: String,
     saved_envs: preferences::PreferencesMap<Vec<String>>,
-    writer: W,
+    writer: &'a mut W,
 }
 
 impl<'a, W: Write> EnvCommandImpl<'a, W> {
@@ -80,7 +80,7 @@ impl<'a, W: Write> EnvCommandImpl<'a, W> {
     fn new(
         sub_args: &'a argparse::ArgMatches<'a>,
         _main_args: &'a argparse::ArgMatches<'a>,
-        writer: W,
+        writer: &'a mut W,
     ) -> EnvCommandImpl<'a, W> {
         // make a logger object
         logger::build_logger(sub_args, std::io::stdout());

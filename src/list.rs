@@ -22,7 +22,7 @@ use std::io::Write;
 pub fn list_command<W: Write>(
     sub_args: &argparse::ArgMatches,
     _main_args: &argparse::ArgMatches,
-    writer: W,
+    writer: &mut W,
 ) -> Result<(), String> {
     let mut lister = ListImpl::new(sub_args, _main_args, writer)?;
     lister.run();
@@ -51,7 +51,7 @@ struct ListImpl<'a, W: Write> {
     local_setups: FnvHashMap<String, String>,
     db: db::DB,
     tags: Option<Vec<String>>,
-    writer: W,
+    writer: &'a mut W,
 }
 
 impl<'a, W: Write> ListImpl<'a, W> {
@@ -60,7 +60,7 @@ impl<'a, W: Write> ListImpl<'a, W> {
     fn new(
         sub_args: &'a argparse::ArgMatches<'a>,
         _main_args: &'a argparse::ArgMatches<'a>,
-        writer: W,
+        writer: &'a mut W,
     ) -> Result<ListImpl<'a, W>, String> {
         // Here we will process any of the global arguments in the future but for now there is
         // nothing so we do nothing but create the database. The global arguments might affect
