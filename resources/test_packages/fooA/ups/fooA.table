@@ -1,0 +1,8 @@
+# Test spaces and comment lines
+   setupRequired(fooB -j v1)
+   setupOptional(fooC -j v1)
+
+setupRequired(fooB)
+setupOptional(fooC)
+
+envPrepend(PATH, ${PRODUCT_DIR}/bin)

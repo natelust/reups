@@ -1,0 +1,14 @@
+FILE = version
+PRODUCT = fooA
+VERSION = v3
+#***************************************
+
+Group:
+   FLAVOR = Linux64
+   QUALIFIERS = ""
+   DECLARER = nate2
+   DECLARED = Tue Mar 26 11:21:26 2019
+   PROD_DIR = /home/nate2/rust/workspace/reups/resources/test_packages/fooA
+   UPS_DIR = ups
+   TABLE_FILE = test_packages/fooA/ups/fooA.table
+End:

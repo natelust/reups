@@ -1,0 +1,2 @@
+    setupRequired(fooC -j v1)
+setupRequired(fooC)

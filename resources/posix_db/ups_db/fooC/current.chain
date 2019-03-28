@@ -1,0 +1,12 @@
+FILE = version
+PRODUCT = fooC 
+CHAIN = 
+#***************************************
+
+#Group:
+   FLAVOR = Linux64
+   VERSION = v2
+   QUALIFIERS = ""
+   DECLARER = nate2
+   DECLARED = Tue Mar 26 13:42:10 2019
+#End:
