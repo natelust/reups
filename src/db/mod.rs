@@ -48,7 +48,7 @@ impl<'a> DBIter<'a> {
 /// Implementing the iterator type trait for DBIter so that the stuct
 /// can be used in places where iteration happens
 impl<'a> Iterator for DBIter<'a> {
-    type Item = (&'a str, &'a Box<dyn db_impl::DBImpl<table::Table>>);
+    type Item = (&'a str, &'a Box<dyn db_impl::DBImpl>);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.pos >= self.len {
@@ -162,7 +162,7 @@ impl DBBuilderTrait for BuildBundle {
     }
 
     fn build(self) -> Result<DB, String> {
-        let mut db_dict = FnvHashMap::<String, Box<db_impl::DBImpl<table::Table>>>::default();
+        let mut db_dict = FnvHashMap::<String, Box<db_impl::DBImpl>>::default();
         let me = self?;
         if me.eups_env {
             let eups_env_path = cogs::get_eups_path_from_env();
@@ -229,7 +229,7 @@ impl DBBuilderTrait for BuildBundle {
 /// relations between products, versions, tags, and tables that are encoded in the
 /// filesystem based database.
 pub struct DB {
-    database_map: FnvHashMap<String, Box<dyn db_impl::DBImpl<table::Table>>>,
+    database_map: FnvHashMap<String, Box<dyn db_impl::DBImpl>>,
     database_names: Vec<String>,
     cache: RefCell<FnvHashMap<(String, String), table::Table>>,
 }
@@ -252,7 +252,7 @@ impl DB {
         let return_vec: Vec<&str> = vec![];
         self.iter().fold(
             return_vec,
-            |mut acc: Vec<&str>, (_, db): (&str, &Box<dyn db_impl::DBImpl<table::Table>>)| {
+            |mut acc: Vec<&str>, (_, db): (&str, &Box<dyn db_impl::DBImpl>)| {
                 acc.extend(db.get_products());
                 acc
             },

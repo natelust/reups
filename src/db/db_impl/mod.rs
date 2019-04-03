@@ -18,9 +18,9 @@ use users;
 /// Implementation of an database object. The outside visible database
 /// object, is comprised of some number of instances of structs which
 /// implement this trait
-pub trait DBImpl<T> {
+pub trait DBImpl {
     fn get_location(&self) -> &super::PathBuf;
-    fn get_table(&self, product: &str, version: &str) -> Option<T>;
+    fn get_table(&self, product: &str, version: &str) -> Option<Table>;
     fn get_tags(&self, product: &str) -> Option<Vec<&str>>;
     fn get_versions(&self, product: &str) -> Option<Vec<&str>>;
     fn get_products(&self) -> Vec<&str>;
@@ -42,7 +42,7 @@ pub trait DBImplDeclare: Sized {
     fn declare_in_memory(self, inputs: &Vec<DeclareInputs>) -> Result<Self, (Self, String)>;
 }
 
-impl DBImplDeclare for Box<dyn DBImpl<Table>> {
+impl DBImplDeclare for Box<dyn DBImpl> {
     fn declare_in_memory(mut self, inputs: &Vec<DeclareInputs>) -> Result<Self, (Self, String)> {
         let result = self.declare_in_memory_impl(inputs);
         match result {

@@ -170,7 +170,7 @@ impl PosixDBImpl {
     }
 }
 
-impl super::DBImpl<Table> for PosixDBImpl {
+impl super::DBImpl for PosixDBImpl {
     fn get_location(&self) -> &super::PathBuf {
         &self.directory
     }
