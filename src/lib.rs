@@ -16,6 +16,7 @@ use regex;
 mod cogs;
 mod argparse;
 mod completions;
+#[macro_use]
 mod db;
 mod declare;
 mod env;
