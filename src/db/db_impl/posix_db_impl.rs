@@ -2,13 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  * Copyright Nate Lust 2019*/
-
 use super::DBFile;
+use super::DBImpl;
 use super::DBLoadControl;
 use super::FnvHashMap;
 use super::PathBuf;
 use super::Table;
 use crate::regex;
+use crypto::digest::Digest;
+use crypto::sha1::Sha1;
 use std::fs;
 use std::path;
 use std::sync::mpsc;
@@ -44,14 +46,7 @@ Group:
 End:
 ";
 
-pub struct PosixDBImpl {
-    directory: super::PathBuf,
-    tag_to_product_info: FnvHashMap<String, FnvHashMap<String, DBFile>>,
-    product_to_version_info: FnvHashMap<String, FnvHashMap<String, DBFile>>,
-    product_to_tags: FnvHashMap<String, Vec<String>>,
-    product_to_ident: Option<FnvHashMap<String, Vec<String>>>,
-    product_ident_version: Option<FnvHashMap<String, FnvHashMap<String, String>>>,
-}
+make_db_source_struct!(PosixDBImpl, DBFile);
 
 impl PosixDBImpl {
     pub fn new(
@@ -59,7 +54,7 @@ impl PosixDBImpl {
         preload: Option<&DBLoadControl>,
         ident_regex: Option<regex::Regex>,
     ) -> Result<PosixDBImpl, String> {
-        let (directory, product_to_info, tags_to_info, product_to_tags) = build_db(path, preload)?;
+        let (location, product_to_info, tags_to_info, product_to_tags) = build_db(path, preload)?;
         let (product_to_ident, product_ident_version) = if ident_regex.is_some() {
             let mut product_to_ident = FnvHashMap::<String, Vec<String>>::default();
             let mut product_ident_version =
@@ -84,7 +79,7 @@ impl PosixDBImpl {
             (None, None)
         };
         Ok(PosixDBImpl {
-            directory,
+            location,
             tag_to_product_info: tags_to_info,
             product_to_version_info: product_to_info,
             product_to_tags,
@@ -143,7 +138,7 @@ impl PosixDBImpl {
         let mut new_map = FnvHashMap::<&str, &str>::default();
         for (k, v) in translate.iter() {
             crate::debug!("inserting key value: {}, {}", k, v);
-            new_map.insert(k, dbfile.entry(v).unwrap());
+            new_map.insert(k, dbfile.get(v).unwrap());
         }
         self.format_version_file(&new_map)
     }
@@ -164,30 +159,87 @@ impl PosixDBImpl {
         translate.insert("date", "DECLARED");
         let mut new_map = FnvHashMap::<&str, &str>::default();
         for (k, v) in translate.iter() {
-            new_map.insert(k, dbfile.entry(v).unwrap());
+            new_map.insert(k, dbfile.get(v).unwrap());
         }
         self.format_tag_file(&new_map)
+    }
+
+    pub fn to_json(&self, loc: &PathBuf) -> super::JsonDBImpl {
+        let mut tag_to_product_info: FnvHashMap<
+            String,
+            FnvHashMap<String, FnvHashMap<String, String>>,
+        > = FnvHashMap::default();
+        let mut product_to_version_info: FnvHashMap<
+            String,
+            FnvHashMap<String, FnvHashMap<String, String>>,
+        > = FnvHashMap::default();
+        let mut product_to_ident: FnvHashMap<String, Vec<String>> = FnvHashMap::default();
+        let mut product_ident_version: FnvHashMap<String, FnvHashMap<String, String>> =
+            FnvHashMap::default();
+        let mut product_to_version_table: FnvHashMap<String, FnvHashMap<String, Table>> =
+            FnvHashMap::default();
+        for (tag, map) in self.tag_to_product_info.iter() {
+            for (product, info) in map.iter() {
+                tag_to_product_info
+                    .entry(tag.clone())
+                    .or_insert(FnvHashMap::default())
+                    .insert(product.clone(), info.to_map());
+            }
+        }
+        let ident_empty = self.product_to_ident.is_none() && self.product_ident_version.is_none();
+        let mut hasher = Sha1::new();
+        for (product, map) in self.product_to_version_info.iter() {
+            for (version, info) in map.iter() {
+                hasher.reset();
+                product_to_version_info
+                    .entry(product.clone())
+                    .or_insert(FnvHashMap::default())
+                    .insert(version.clone(), info.to_map());
+                if ident_empty {
+                    hasher.input_str(version);
+                    product_to_ident
+                        .entry(product.clone())
+                        .or_insert(vec![])
+                        .push(hasher.result_str());
+                    product_ident_version
+                        .entry(product.clone())
+                        .or_insert(FnvHashMap::default())
+                        .insert(hasher.result_str(), version.clone());
+                }
+                product_to_version_table
+                    .entry(product.clone())
+                    .or_insert(FnvHashMap::default())
+                    .insert(version.clone(), self.get_table(product, version).unwrap());
+            }
+        }
+        if !ident_empty {
+            product_to_ident = self.product_to_ident.as_ref().unwrap().clone();
+            product_ident_version = self.product_ident_version.as_ref().unwrap().clone();
+        }
+        super::JsonDBImpl {
+            location: loc.clone(),
+            tag_to_product_info,
+            product_to_version_info,
+            product_to_tags: self.product_to_tags.clone(),
+            product_to_ident: Some(product_to_ident),
+            product_ident_version: Some(product_ident_version),
+            product_to_version_table,
+        }
     }
 }
 
 impl super::DBImpl for PosixDBImpl {
-    fn get_location(&self) -> &super::PathBuf {
-        &self.directory
-    }
-
-    fn get_products(&self) -> Vec<&str> {
-        self.product_to_tags.keys().map(|a| a.as_str()).collect()
-    }
+    make_db_source_default_methods!();
 
     fn get_table(&self, product: &str, version: &str) -> Option<Table> {
         let db_file = self.product_to_version_info.get(product)?.get(version)?;
-        let prod_dir = db_file.entry(&"PROD_DIR")?;
-        let mut ups_dir = db_file.entry(&"UPS_DIR")?;
+        let prod_dir = db_file.get(&"PROD_DIR")?;
+        let mut ups_dir = db_file.get(&"UPS_DIR")?;
         let prod_dir_path = super::PathBuf::from(prod_dir);
         let mut complete = if prod_dir_path.is_absolute() {
             prod_dir_path
         } else {
-            let base = self.directory.parent().unwrap().clone();
+            let base = self.location.parent().unwrap().clone();
             base.join(prod_dir_path)
         };
 
@@ -211,103 +263,25 @@ impl super::DBImpl for PosixDBImpl {
         table
     }
 
-    fn lookup_flavor_version(&self, product: &str, version: &str) -> Option<&str> {
-        self.product_to_version_info
-            .get(product)?
-            .get(version)?
-            .entry(&"FLAVOR")
-    }
+    fn is_writable(&self) -> bool {
+        let mut test = self.get_location().clone();
+        test.push("readonly_test_file.txt");
 
-    fn get_tags(&self, product: &str) -> Option<Vec<&str>> {
-        Some(
-            self.product_to_tags
-                .get(product)?
-                .iter()
-                .map(|a| a.as_str())
-                .collect(),
-        )
-    }
-
-    fn get_versions(&self, product: &str) -> Option<Vec<&str>> {
-        Some(
-            self.product_to_version_info
-                .get(product)?
-                .keys()
-                .map(|a| a.as_str())
-                .collect(),
-        )
-    }
-
-    fn get_identities(&self, product: &str) -> Option<Vec<&str>> {
-        Some(
-            self.product_to_ident
-                .as_ref()?
-                .get(product)?
-                .iter()
-                .map(|a| a.as_str())
-                .collect(),
-        )
-    }
-
-    fn lookup_version_tag(&self, product: &str, tag: &str) -> Option<&str> {
-        Some(
-            self.tag_to_product_info
-                .get(tag)?
-                .get(product)?
-                .entry("VERSION")?,
-        )
-    }
-
-    fn lookup_version_ident(&self, product: &str, ident: &str) -> Option<&str> {
-        Some(
-            self.product_ident_version
-                .as_ref()?
-                .get(product)?
-                .get(ident)?
-                .as_str(),
-        )
-    }
-
-    fn lookup_location_version(&self, product: &str, version: &str) -> Option<&PathBuf> {
-        if self
-            .product_to_version_info
-            .get(product)?
-            .get(version)
-            .is_some()
-        {
-            Some(&self.directory)
-        } else {
-            None
+        let per = std::fs::OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(&test);
+        match per {
+            Ok(_) => {
+                std::fs::remove_file(test).expect("Problem cleaning up readonly test file");
+                true
+            }
+            Err(_) => false,
         }
     }
 
-    fn has_identity(&self, product: &str, ident: &str) -> bool {
-        self.product_ident_version.is_some()
-            && self
-                .product_ident_version
-                .as_ref()
-                .unwrap()
-                .get(product)
-                .is_some()
-            && self
-                .product_ident_version
-                .as_ref()
-                .unwrap()
-                .get(product)
-                .unwrap()
-                .contains_key(ident)
-    }
-
-    fn has_product(&self, product: &str) -> bool {
-        self.product_to_version_info.contains_key(product)
-    }
-
-    fn identities_populated(&self) -> bool {
-        self.product_ident_version.is_some()
-    }
-
     fn declare_in_memory_impl(&mut self, inputs: &Vec<super::DeclareInputs>) -> Result<(), String> {
-        let mut base_dir = self.directory.clone();
+        let base_dir = self.location.clone();
         let check_version_name = |input: &super::DeclareInputs| {
             let version = if let Some(id) = input.ident {
                 format!("{}-{}", input.version, id)
@@ -365,7 +339,8 @@ impl super::DBImpl for PosixDBImpl {
         }
         // If the function has gotten this far, no products exist and all should be added
         for input in inputs.iter() {
-            base_dir.push(input.product);
+            let mut local_base_dir = base_dir.clone();
+            local_base_dir.push(input.product);
 
             let (user, date) = super::get_declare_info();
             let flav = if let Some(flav) = input.flavor {
@@ -407,7 +382,7 @@ impl super::DBImpl for PosixDBImpl {
             );
             // Construct the version file string
             let version_contents = self.format_version_file(&version_map);
-            let mut version_dir = base_dir.clone();
+            let mut version_dir = local_base_dir.clone();
             version_dir.push(format!("{}.version", version));
 
             self.product_to_version_info
@@ -417,9 +392,9 @@ impl super::DBImpl for PosixDBImpl {
                 .or_insert(DBFile::new_with_contents(version_dir, version_contents));
 
             if let Some(tg) = input.tag {
-                version_map.insert("table", tg);
+                version_map.insert("tag", tg);
                 let tag_contents = self.format_tag_file(&version_map);
-                let mut tag_dir = base_dir.clone();
+                let mut tag_dir = local_base_dir.clone();
                 tag_dir.push(format!("{}.chain", tg));
 
                 // insert the info about the product tags into the database
@@ -475,15 +450,14 @@ impl super::DBImpl for PosixDBImpl {
         crate::info!("Running sync in posix_db_impl for product {}", product);
         // Get a string representation of the file contents
         // Make sure product directory exists
-        let mut product_dir = self.directory.clone();
+        let mut product_dir = self.location.clone();
         product_dir.push(product);
         if !product_dir.exists() {
             let _ = fs::create_dir(&product_dir)?;
         }
         // loop over all tags
-        crate::debug!("loop over all input products in sync");
         if self.product_to_tags.contains_key(product) {
-            crate::debug!("Syncing product {} in impl", product);
+            crate::debug!("Syncing tags for product {}", product);
             for tag in self.product_to_tags[product].iter() {
                 let tag_prod_file = self.tag_to_product_info.get(tag);
                 if let Some(tag_dbfile_map) = tag_prod_file {
@@ -510,6 +484,8 @@ impl super::DBImpl for PosixDBImpl {
                     ));
                 }
             }
+        } else {
+            crate::info!("No database tags found for {}", product);
         }
 
         crate::debug!("Sync versions of product {}", product);

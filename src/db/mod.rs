@@ -9,6 +9,7 @@
    between all the products reups is aware of.
 */
 use fnv::FnvHashMap;
+#[macro_use]
 mod db_impl;
 mod dbfile;
 pub mod graph;
@@ -20,9 +21,9 @@ use crate::cogs;
 
 use self::db_impl::DBImplDeclare;
 pub use self::db_impl::DeclareInputs;
+pub use self::db_impl::*;
 use std::cell::RefCell;
 use std::fmt;
-use std::fs::OpenOptions;
 use std::path::PathBuf;
 
 /// Data structure to hold state related to iterating over a db object.
@@ -209,12 +210,32 @@ impl DBBuilderTrait for BuildBundle {
         };
         // Handle any other paths that were added
         for (name, pth) in me.db_sources.iter() {
-            let extra_db =
-                match db_impl::PosixDBImpl::new(pth.clone(), me.load_control.as_ref(), None) {
-                    Ok(x) => x,
-                    Err(msg) => return Err(msg),
+            let extension = pth.extension();
+            let extra_db: Box<db_impl::DBImpl> =
+                if extension.is_some() && extension.unwrap() == "json" {
+                    if !pth.exists() {
+                        println!("in not exists");
+                        crate::warn!(
+                        "The backend {} does not exist on disk, creating empty source in memory",
+                        pth.to_str().unwrap()
+                    );
+                        match db_impl::JsonDBImpl::new(pth) {
+                            Ok(x) => Box::new(x),
+                            Err(_) => return Err("Problem creating new json source\n".to_string()),
+                        }
+                    } else {
+                        match db_impl::JsonDBImpl::from_file(pth) {
+                            Ok(x) => Box::new(x),
+                            Err(e) => return Err(format!("{}\n", e.to_string())),
+                        }
+                    }
+                } else {
+                    match db_impl::PosixDBImpl::new(pth.clone(), me.load_control.as_ref(), None) {
+                        Ok(x) => Box::new(x),
+                        Err(msg) => return Err(msg),
+                    }
                 };
-            db_dict.insert(name.clone(), Box::new(extra_db));
+            db_dict.insert(name.clone(), extra_db);
         }
         let db_names: Vec<String> = db_dict.keys().map(|x| x.clone()).collect();
         Ok(DB {
@@ -488,21 +509,7 @@ impl DB {
         } else {
             let mut write_set: Vec<String> = vec![];
             for (name, db) in self.iter() {
-                let mut test = db.get_location().clone();
-                test.push("readonly_test_file.txt");
-
-                let per = OpenOptions::new()
-                    .append(true)
-                    .create(true)
-                    .open(test.clone());
-                let writable = match per {
-                    Err(_) => false,
-                    Ok(_) => true,
-                };
-                crate::debug!("database source {} is writeable {}", name, writable);
-                drop(per);
-                if writable {
-                    std::fs::remove_file(test).expect("Problem cleaning up readonly test file");
+                if db.is_writable() {
                     write_set.push(name.to_string());
                 }
             }

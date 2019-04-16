@@ -61,8 +61,26 @@ impl DBFile {
         db_file
     }
 
+    /// Copies the contents of the dbfile into a HashMap of String to String,
+    /// returning ownership of new HashMap
+    pub fn to_map(&self) -> FnvHashMap<String, String> {
+        let db_is_empty: bool;
+        {
+            db_is_empty = self.contents.borrow().is_empty();
+        }
+        if db_is_empty {
+            self.load_file().unwrap_or_else(|_e| {
+                exit_with_message!(format!(
+                    "Problem accessing {}, could not create database",
+                    self.path.to_str().unwrap()
+                ));
+            });
+        }
+        self.contents.borrow().clone()
+    }
+
     /// Retrieves the value of the DBFile corresponding to the supplied key
-    pub fn entry(&self, key: &str) -> Option<&str> {
+    pub fn get(&self, key: &str) -> Option<&str> {
         let db_is_empty: bool;
         {
             db_is_empty = self.contents.borrow().is_empty();

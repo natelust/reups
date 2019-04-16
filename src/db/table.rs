@@ -6,6 +6,7 @@
 use fnv::FnvHashMap;
 use lazy_static;
 use regex::Regex;
+use serde_derive::{Deserialize, Serialize};
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
@@ -40,7 +41,7 @@ pub enum VersionType {
 
 /// Enum to describ the action of an environment variable, prepend or append to the
 /// env var.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum EnvActionType {
     Prepend,
     Append,

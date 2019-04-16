@@ -3,8 +3,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  * Copyright Nate Lust 2019*/
 
+#[macro_use]
+mod base;
+pub mod json_db_impl;
 pub mod posix_db_impl;
+pub use self::json_db_impl::*;
 pub use self::posix_db_impl::*;
+use super::table;
 use super::table::Table;
 use super::DBFile;
 use super::DBLoadControl;
@@ -32,6 +37,7 @@ pub trait DBImpl {
     fn has_identity(&self, product: &str, ident: &str) -> bool;
     fn has_product(&self, product: &str) -> bool;
     fn identities_populated(&self) -> bool;
+    fn is_writable(&self) -> bool;
 
     fn declare_in_memory_impl(&mut self, inputs: &Vec<DeclareInputs>) -> Result<(), String>;
     fn sync(&self, product: &str) -> std::io::Result<()>;

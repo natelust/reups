@@ -28,6 +28,7 @@ pub static SYSTEM_OS: &str = "Linux64";
  *
  * This may be replaced in the future with the use of a logging system.
  */
+#[macro_export]
 macro_rules! exit_with_message {
     ($message:expr) => {
         use std::process::exit;
@@ -46,11 +47,16 @@ pub fn path_string_to_vec(path_string: &str) -> Result<Vec<PathBuf>, String> {
         .iter()
         .filter_map(|path| {
             let mut converted_path = PathBuf::from(path);
-            converted_path.push("ups_db");
-            if !converted_path.is_dir() {
-                return None;
+            let extension = converted_path.extension();
+            if extension.is_some() && extension.unwrap() == "json" {
+                Some(converted_path)
+            } else {
+                converted_path.push("ups_db");
+                if !converted_path.is_dir() {
+                    return None;
+                }
+                Some(converted_path)
             }
-            Some(converted_path)
         })
         .collect();
     if eups_path_vec.len() != eups_pathbuf_vec.len() {
