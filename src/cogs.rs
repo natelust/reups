@@ -48,6 +48,7 @@ pub fn path_string_to_vec(path_string: &str) -> Result<Vec<PathBuf>, String> {
         .filter_map(|path| {
             let mut converted_path = PathBuf::from(path);
             let extension = converted_path.extension();
+            // Check if the supplied path is a json file, if so just return it
             if extension.is_some() && extension.unwrap() == "json" {
                 Some(converted_path)
             } else {

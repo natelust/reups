@@ -52,6 +52,8 @@ impl DBFile {
         db_file
     }
 
+    /// Create a DBFile object from a String containing contents of a file instead
+    /// of reading in the contents.
     pub fn new_with_contents(path: path::PathBuf, file_contents: String) -> DBFile {
         let db_file = DBFile {
             path: path,
@@ -137,6 +139,8 @@ impl DBFile {
         Ok(())
     }
 
+    /// Parse a string corresponding to the contents of a file, and store them
+    /// in self.
     fn parse_string(&self, contents: String) {
         for line in contents.lines() {
             for (i, char) in line.char_indices() {

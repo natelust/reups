@@ -15,6 +15,18 @@ use crate::db::DBBuilderTrait;
 use crate::logger;
 use std::path::PathBuf;
 
+/**
+ * This is the entry-point for the declare subcommand. Declare is used to add products to a
+ * database for future use. This subcommand must be supplied a product name, version, and path to a
+ * product. It may optionally be supplied with a tag. If there is only one writable database source
+ * the command will write to that source. If more than one sources are found, the source
+ * argument must be supplied. The source argument specifies what database backend the declared
+ * product should be written to. Depending on the backend, the ident argument may or mar not be
+ * optional. Currently a posix backend does not require it, but a JSON backend does.
+ *
+ * * sub_args - Arguments matched from the command line to the given sub command
+ * * _main_args - Arguments matched from the command line to the main reups executable,
+ **/
 pub fn declare_command(
     sub_args: &argparse::ArgMatches,
     _main_args: &argparse::ArgMatches,

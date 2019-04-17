@@ -3,6 +3,11 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  * Copyright Nate Lust 2019*/
 
+/**
+ * json_db_impl is a backend database source for the main DB class. It
+ * stores all of the information about products in a single file.
+ **/
+
 use super::DBImpl;
 use super::FnvHashMap;
 use super::PathBuf;
@@ -16,6 +21,7 @@ use std::fs;
 use std::io::prelude::*;
 use std::io::{Error, ErrorKind, Write};
 
+/// Struct representing the serialized form a JsonDBImpl will take on disk
 #[derive(Serialize, Deserialize)]
 struct NewSerde {
     #[serde(rename = "Versions")]
@@ -26,6 +32,7 @@ struct NewSerde {
     tags: Vec<FnvHashMap<String, String>>,
 }
 
+/// Structure to contain the dependency structure of a table
 #[derive(Serialize, Deserialize, Debug)]
 struct TableDepJson {
     required: FnvHashMap<String, String>,
@@ -41,6 +48,7 @@ impl TableDepJson {
     }
 }
 
+/// Structure to represent a table on disk
 #[derive(Serialize, Deserialize, Debug)]
 struct TableInfoJson {
     exact: TableDepJson,
@@ -58,11 +66,14 @@ impl TableInfoJson {
     }
 }
 
+/// Database backend source that stores data in a single json file
 make_db_source_struct!(JsonDBImpl,
                       FnvHashMap<String, String>,
                       product_to_version_table: FnvHashMap<String, FnvHashMap<String, Table>>);
 
 impl JsonDBImpl {
+    /// Creates a new empty JsonDBImpl instance, which will be stored at the location provided
+    /// if written to disk.
     pub fn new(loc: &PathBuf) -> Result<JsonDBImpl, String> {
         Ok(JsonDBImpl {
             location: loc.clone(),
@@ -74,6 +85,9 @@ impl JsonDBImpl {
             product_to_version_table: FnvHashMap::default(),
         })
     }
+
+    /// Creates a new JsonDBImpl from a previously serialized struct stored in the JSON file
+    /// located at the path provided.
     pub fn from_file(loc: &PathBuf) -> std::io::Result<JsonDBImpl> {
         let mut json_file_raw = std::fs::OpenOptions::new()
             .read(true)
@@ -100,6 +114,7 @@ impl JsonDBImpl {
     }
 }
 
+// Deserialize trait, used to load an object from disk
 impl<'de> Deserialize<'de> for JsonDBImpl {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -171,6 +186,7 @@ impl<'de> Deserialize<'de> for JsonDBImpl {
     }
 }
 
+// Serialized trait, used to store an object to disk
 impl Serialize for JsonDBImpl {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -258,7 +274,9 @@ impl Serialize for JsonDBImpl {
     }
 }
 
+// Implement the trait to make JsonDBImpl a database source
 impl super::DBImpl for JsonDBImpl {
+    // Add in pre-defined methods from the base instance
     make_db_source_default_methods!();
 
     fn get_table(&self, product: &str, version: &str) -> Option<Table> {
