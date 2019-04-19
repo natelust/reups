@@ -46,9 +46,14 @@ Group:
 End:
 ";
 
+/// Database back end source that uses a posix file system to store information
 make_db_source_struct!(PosixDBImpl, DBFile);
 
 impl PosixDBImpl {
+    /// Creates a new Posix database source given a filesystem location, and optionally
+    /// a control on which files should be loaded at creation instead of being lazily loaded as
+    /// needed, and a regular expression that may be used to parse versions to extract identity
+    /// strings
     pub fn new(
         path: PathBuf,
         preload: Option<&DBLoadControl>,
@@ -88,6 +93,9 @@ impl PosixDBImpl {
         })
     }
 
+    /// Formats a given string, replacing specified fields with corresponding values from map, this
+    /// is similar to how the format macro works, except it allows replacements to happen by name
+    /// and not just ordering.
     fn format_template_file(
         &self,
         input: &str,
@@ -110,6 +118,7 @@ impl PosixDBImpl {
         formatted_string
     }
 
+    /// Formats the templated format string with supplied information
     fn format_version_file(&self, map: &FnvHashMap<&str, &str>) -> String {
         let fields: Vec<&str> = vec![
             "product",
@@ -124,6 +133,9 @@ impl PosixDBImpl {
         self.format_template_file(VERSION_STR, fields, map)
     }
 
+    /// Formats the templated version string into a format that is expected when a function
+    /// accesses the data through a DBFile interface. This mainly means just reformatting the keys
+    /// used in the mapping
     fn format_version_dbfile(&self, dbfile: &DBFile) -> String {
         crate::info!("Formatting dbfile into version string");
         let mut translate = FnvHashMap::default();
@@ -143,11 +155,15 @@ impl PosixDBImpl {
         self.format_version_file(&new_map)
     }
 
+    /// Formats the templated tag string with supplied information
     fn format_tag_file(&self, map: &FnvHashMap<&str, &str>) -> String {
         let fields: Vec<&str> = vec!["product", "tag", "flavor", "version", "user", "date"];
         self.format_template_file(TABLE_STR, fields, map)
     }
 
+    /// Formats the templated tag string into a format that is expected when a function
+    /// accesses the data through a DBFile interface. This mainly means just reformatting the keys
+    /// used in the mapping
     fn format_tag_dbfile(&self, dbfile: &DBFile) -> String {
         crate::info!("Formatting dbfile into tag string");
         let mut translate = FnvHashMap::default();
@@ -164,7 +180,9 @@ impl PosixDBImpl {
         self.format_tag_file(&new_map)
     }
 
+    /// Converts Posix database backend into a Json based database backend source
     pub fn to_json(&self, loc: &PathBuf) -> super::JsonDBImpl {
+        // Create container objects
         let mut tag_to_product_info: FnvHashMap<
             String,
             FnvHashMap<String, FnvHashMap<String, String>>,
@@ -178,6 +196,8 @@ impl PosixDBImpl {
             FnvHashMap::default();
         let mut product_to_version_table: FnvHashMap<String, FnvHashMap<String, Table>> =
             FnvHashMap::default();
+
+        // populate the tags to product map with maps created from the corresponding field in self
         for (tag, map) in self.tag_to_product_info.iter() {
             for (product, info) in map.iter() {
                 tag_to_product_info
@@ -186,15 +206,24 @@ impl PosixDBImpl {
                     .insert(product.clone(), info.to_map());
             }
         }
+
+        // Check if identities are defined in self, if not build a hasher to hash the version to
+        // use as an identity. This is needed because JSON database sources require an identity to be
+        // specified, as they are more strict than posix in this case
         let ident_empty = self.product_to_ident.is_none() && self.product_ident_version.is_none();
         let mut hasher = Sha1::new();
         for (product, map) in self.product_to_version_info.iter() {
             for (version, info) in map.iter() {
+                // reset the hasher to an empty state to be reused
                 hasher.reset();
+                // insert a created map into the data structure form a corresponding data structure
+                // in self
                 product_to_version_info
                     .entry(product.clone())
                     .or_insert(FnvHashMap::default())
                     .insert(version.clone(), info.to_map());
+                // if there is no identity, hash the version to use as an identity. Insert in
+                // data structure
                 if ident_empty {
                     hasher.input_str(version);
                     product_to_ident
@@ -206,16 +235,21 @@ impl PosixDBImpl {
                         .or_insert(FnvHashMap::default())
                         .insert(hasher.result_str(), version.clone());
                 }
+                // Fetch tables and insert them into data structure. This is because a JSON
+                // database source keeps declared tables in the database structure instead of
+                // leaving tables in declared product locations
                 product_to_version_table
                     .entry(product.clone())
                     .or_insert(FnvHashMap::default())
                     .insert(version.clone(), self.get_table(product, version).unwrap());
             }
         }
+        // if there are identities defined, copy those to new data structure
         if !ident_empty {
             product_to_ident = self.product_to_ident.as_ref().unwrap().clone();
             product_ident_version = self.product_ident_version.as_ref().unwrap().clone();
         }
+        // Return new JSON database source
         super::JsonDBImpl {
             location: loc.clone(),
             tag_to_product_info,
@@ -229,8 +263,10 @@ impl PosixDBImpl {
 }
 
 impl super::DBImpl for PosixDBImpl {
+    // copy methods defined in base into Posix impl
     make_db_source_default_methods!();
 
+    /// Returns a table corresponding to a given product and version
     fn get_table(&self, product: &str, version: &str) -> Option<Table> {
         let db_file = self.product_to_version_info.get(product)?.get(version)?;
         let prod_dir = db_file.get(&"PROD_DIR")?;
@@ -263,6 +299,7 @@ impl super::DBImpl for PosixDBImpl {
         table
     }
 
+    /// Returns if this database can be written to
     fn is_writable(&self) -> bool {
         let mut test = self.get_location().clone();
         test.push("readonly_test_file.txt");
@@ -280,6 +317,7 @@ impl super::DBImpl for PosixDBImpl {
         }
     }
 
+    /// Declare inputs to the database in memory only
     fn declare_in_memory_impl(&mut self, inputs: &Vec<super::DeclareInputs>) -> Result<(), String> {
         let base_dir = self.location.clone();
         let check_version_name = |input: &super::DeclareInputs| {
@@ -446,6 +484,7 @@ impl super::DBImpl for PosixDBImpl {
         Ok(())
     }
 
+    /// Sync a given product to the database source storage backend
     fn sync(&self, product: &str) -> std::io::Result<()> {
         crate::info!("Running sync in posix_db_impl for product {}", product);
         // Get a string representation of the file contents

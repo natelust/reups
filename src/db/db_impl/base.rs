@@ -5,7 +5,6 @@
 /// true inheritance, this is implemented with a factory macro that
 /// spits out structs of a given name containing all the common fields.
 /// Anywhere this struct is used, FnvHashMap must be imported.
-
 macro_rules! make_db_source_struct {
     ($name:ident, $storage:ty $(, $field:ident:$type:ty),*) => {
         #[derive(Debug)]
@@ -22,7 +21,6 @@ macro_rules! make_db_source_struct {
 }
 
 /// Base implementations for common methods in posix and json
-
 macro_rules! make_db_source_default_methods {
     () => {
     fn get_location(&self) -> &super::PathBuf {

@@ -120,14 +120,20 @@ impl<'de> Deserialize<'de> for JsonDBImpl {
     where
         D: Deserializer<'de>,
     {
+        // helper is the struct deserialized from disk by serde, it must be converted to the in
+        // memory representation of the db source
         let mut helper = NewSerde::deserialize(deserializer)?;
+        // create a new in memory db source, initialized to an empty location, consumers of the
+        // deserialized source should set this location.
         let mut new_dbimpl = JsonDBImpl::new(&PathBuf::new()).unwrap();
         // do Versions first
         for (mut version_info, table_info) in helper.versions.drain(..).zip(helper.tables.drain(..))
         {
+            // pop off the product version, and ident from the hashmap, eliminates creating copies
             let product = version_info.remove("PRODUCT").unwrap();
             let version = version_info.remove("VERSION").unwrap();
             let ident = version_info.remove("IDENT").unwrap();
+            // Create a new table object to populate
             let new_table = super::Table {
                 name: product.clone(),
                 path: None,
@@ -142,6 +148,7 @@ impl<'de> Deserialize<'de> for JsonDBImpl {
                 }),
                 env_var: table_info.env,
             };
+            // populate the various fields of the impl struct
             new_dbimpl
                 .product_to_ident
                 .as_mut()
@@ -169,8 +176,10 @@ impl<'de> Deserialize<'de> for JsonDBImpl {
         }
         // now take care of tags
         for mut tag_info in helper.tags.drain(..) {
+            // pop the product and tag fields from the dict to save on allocations
             let product = tag_info.remove("PRODUCT").unwrap();
             let tag = tag_info.remove("TAG").unwrap();
+            // populate the fields on the impl
             new_dbimpl
                 .tag_to_product_info
                 .entry(tag.clone())
@@ -192,19 +201,24 @@ impl Serialize for JsonDBImpl {
     where
         S: Serializer,
     {
+        // Create the data structures which will be serialized
         let mut versions: Vec<FnvHashMap<String, String>> = vec![];
         let mut tables: Vec<TableInfoJson> = vec![];
         let mut tags: Vec<FnvHashMap<String, String>> = vec![];
 
+        // populate the structures
         for (product, version_map) in self.product_to_version_info.iter() {
             // lets process tags first
             for tag in self.product_to_tags[product].iter() {
+                // a given tag may not be associated with the product under
+                // consideration, so verify the mapping contains this product
                 if self
                     .tag_to_product_info
                     .get(tag)
                     .unwrap()
                     .contains_key(product)
                 {
+                    // Fetch the associated tag mapping
                     let mut tag_info = self
                         .tag_to_product_info
                         .get(tag)
@@ -212,6 +226,8 @@ impl Serialize for JsonDBImpl {
                         .get(product)
                         .unwrap()
                         .clone();
+                    // insert product and tag info into the mapping so the info
+                    // will be available to use in deserializing
                     tag_info.insert("PRODUCT".to_string(), product.clone());
                     tag_info.insert("TAG".to_string(), tag.clone());
                     tags.push(tag_info);
@@ -219,6 +235,7 @@ impl Serialize for JsonDBImpl {
             }
             // now for versions
             for (version, version_info) in version_map {
+                // look up the identity associated with this version
                 let ident_vec: Vec<(&String, &String)> =
                     self.product_ident_version.as_ref().unwrap()[product]
                         .iter()
@@ -226,6 +243,8 @@ impl Serialize for JsonDBImpl {
                         .collect();
                 let (ident, _) = ident_vec[0];
 
+                // Fetch the table corresponding to this product, version from the
+                // in memory table and convert it a struct for serialization
                 let in_memory_table = self.get_table(product, version).unwrap();
                 let mut new_table = TableInfoJson::new();
                 match in_memory_table.exact {
@@ -257,6 +276,8 @@ impl Serialize for JsonDBImpl {
                 new_table.env = env_var_new;
                 tables.push(new_table);
 
+                // Use the version info mapping and add product, version, identity
+                // as entries so they can be used in the deserialization process
                 let mut new_version_map = version_info.clone();
                 new_version_map.insert("PRODUCT".to_string(), product.clone());
                 new_version_map.insert("VERSION".to_string(), version.clone());
@@ -265,6 +286,7 @@ impl Serialize for JsonDBImpl {
                 versions.push(new_version_map);
             }
         }
+        // create the serialization struct, and serialize it
         let tmp = NewSerde {
             versions,
             tables,
@@ -306,6 +328,10 @@ impl super::DBImpl for JsonDBImpl {
     }
 
     fn declare_in_memory_impl(&mut self, inputs: &Vec<super::DeclareInputs>) -> Result<(), String> {
+        // This function takes the list of inputs to declare, insures the inputs are to already in
+        // the database source and if not, adds the input information to the relevant fields of the
+        // db source
+
         // verify that all inputs to be declared are not in the db already
         for input in inputs.iter() {
             if input.ident.is_none() {
@@ -469,6 +495,12 @@ impl super::DBImpl for JsonDBImpl {
     }
 
     fn sync(&self, product: &str) -> std::io::Result<()> {
+        // This function syncs a product to disk. It first reads in the existing on disk
+        // representation of the database, in case it has changed since the in memory version was
+        // created. If no on disk representation is found one is created to sync to. It then
+        // compares the specified product from the in memory representation to the one loaded
+        // from disk, and then adds any missing fields.
+
         crate::info!("Running sync in json_db_impl for product {}", product);
         // check if the source already exists
         let json_exists = self.location.exists();
