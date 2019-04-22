@@ -50,7 +50,16 @@ in each shell where it is to be used. The eval step is necessary to setup all th
 export environment variables into the currently running environment.
 
 The functionality of reups is split among different commands, each having their own options and configuration.
-Details of these commands are as follows:
+
+Reups has a few global options that apply to any of the subcommands listed below:
+
+* -v --verbose: Changes verbosity of messages printed to the command line, multiple instance of this switch increase verbosity
+* -Z --database: Colon-separated list of paths to database sources to use, adds additional sources
+used to populate the database.
+* -U --nouser: Disable loading default sources from user locations
+* -S --nosys: Disable loading default sources from system environment variables
+
+Details of the sub-commands are as follows:
 
 **Prep**
 
@@ -116,7 +125,27 @@ must be used to restore an environment, as shell environment variables are being
 * \<action\>: Required, one of save, restore, delete, list
 * \<name\>: Optional, a name to use when saving or restoring
 
+**Declare**
+Declare is used to add a product to a reups database such that it can be setup and managed by the reups
+system. A minimum decalare invocation takes a directory and a version and adds and entry for the product in
+the database. Depending on what backend is used, an identity for the product must also be supplied. A
+version can be thought of as a human readable identifier that can be an arbitrary string, and an identity
+can be thought of as only needing to be machine readable. It is possible for these values to be the same,
+but this distinction allows for more flexibility in keeping track of products. Currently a posix backend to
+the reups database does not require an identity to be declared, but a JSON backedn does. A tag may also be
+specified when declarning a product, which can be helpful with associating multiple products together.
+As mentioned, reups can make use of many different database backends. If more than one writable backend
+source is found, the source to declare to must be specified in the declare command.
 
+The declare options are as follows:
+
+* product: The name of the product to declare.
+* version: The version to associate with the product
+* -r --root: Path to product directory to declare
+* -t --tag: Tag to add to product when declaring
+* --source: Name of source to declare product to, needed if there is more that one source that is
+writable view all with reups list --sources
+* --ident: Identity to assign to product when declaring
 **/
 
 extern crate reups_lib;
