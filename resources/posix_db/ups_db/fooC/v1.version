@@ -8,7 +8,7 @@ Group:
    QUALIFIERS = ""
    DECLARER = nate2
    DECLARED = Wed Mar 27 13:42:07 2019
-   PROD_DIR = /home/nate2/rust/workspace/reups/resources/test_packages/fooC
+   PROD_DIR = ../test_packages/fooC
    UPS_DIR = ups
-   TABLE_FILE = test_packages/fooC/ups/fooC.table
+   TABLE_FILE = ../test_packages/fooC/ups/fooC.table
 End:
