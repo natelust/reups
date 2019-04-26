@@ -74,6 +74,10 @@ impl Table {
         path: path::PathBuf,
         prod_dir: path::PathBuf,
     ) -> Result<Table, io::Error> {
+        // expand product path in case there are any relative links in the path
+        let prod_dir = prod_dir
+            .canonicalize()
+            .expect("Problem getting full table path");
         let mut f = File::open(path.clone())?;
         crate::debug!("Opened file {}", path.to_str().unwrap());
         let mut contents = String::new();

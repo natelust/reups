@@ -128,7 +128,7 @@ fn build_env<'a, 'b>() -> App<'a, 'b> {
  **/
 fn build_declare<'a, 'b>() -> App<'a, 'b> {
     return SubCommand::with_name("declare")
-        .about("Declare a new product to the reups database")
+        .about("Declare a new product to the reups database. All paths are expanded unless relative is set, in which case paths are assumed to be relative to database path")
         .arg(
             Arg::with_name("product")
                 .required(true)
@@ -167,6 +167,13 @@ fn build_declare<'a, 'b>() -> App<'a, 'b> {
                 .help("Unique identifier to assign to product")
                 .long("ident")
                 .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("relative")
+                .required(false)
+                .help("Set this to allow declaring relative paths, otherwise paths are expanded")
+                .long("relative")
+                .takes_value(false),
         );
 }
 

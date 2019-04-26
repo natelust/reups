@@ -401,10 +401,15 @@ impl super::DBImpl for PosixDBImpl {
             version_map.insert("flavor", flav);
             version_map.insert("user", user.as_str());
             version_map.insert("date", date.as_str());
-            let abs_prod_dir = input
-                .prod_dir
-                .canonicalize()
-                .expect("problem building absolute path for declared product");
+            let abs_prod_dir = if input.relative {
+                crate::warn!("Declaring product with relative path, assumed to be relative to db source path");
+                input.prod_dir.clone()
+            } else {
+                input
+                    .prod_dir
+                    .canonicalize()
+                    .expect("problem building absolute path for declared product")
+            };
             version_map.insert(
                 "prod_dir",
                 abs_prod_dir

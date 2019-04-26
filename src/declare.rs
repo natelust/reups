@@ -22,7 +22,12 @@ use std::path::PathBuf;
  * the command will write to that source. If more than one sources are found, the source
  * argument must be supplied. The source argument specifies what database backend the declared
  * product should be written to. Depending on the backend, the ident argument may or mar not be
- * optional. Currently a posix backend does not require it, but a JSON backend does.
+ * optional. Currently a posix backend does not require it, but a JSON backend does. An additional
+ * flag specifies if the path to the product to be declared is relative or not. If this flag is not
+ * set declare will turn whatever path given into an absolute path. If the path is relative, it
+ * should be relative to the directory containing the database source. For a posix backend, this
+ * would be the directory containing ups_db, if is is JSON it would be the directory containing the
+ * JSON file.
  *
  * * sub_args - Arguments matched from the command line to the given sub command
  * * _main_args - Arguments matched from the command line to the main reups executable,
@@ -53,8 +58,34 @@ impl<'a> DeclareCommandImpl<'a> {
     }
 
     fn run(&mut self) -> Result<(), String> {
+        let db = db::DBBuilder::from_args(self.sub_args).build()?;
+        // see if the user wants to specify product path relative to db location
+        let relative = self.sub_args.is_present("relative");
         let prod_path_string = self.sub_args.value_of("path").unwrap();
-        let prod_path = PathBuf::from(prod_path_string);
+        let prod_path = if relative {
+            let mut paths = vec![];
+            for (_, path) in db.get_db_sources().iter() {
+                let mut tmp_path = PathBuf::from(path)
+                    .parent()
+                    .expect("problem getting parent from db source path")
+                    .to_path_buf();
+                tmp_path.push(prod_path_string);
+                if tmp_path.exists() {
+                    paths.push(tmp_path)
+                }
+            }
+            if paths.len() > 1 {
+                return Err(
+                    "There was more than one database source matching relative path".to_string(),
+                );
+            }
+            if paths.len() == 0 {
+                return Err("No paths were found relative to any db source".to_string());
+            }
+            paths.remove(0)
+        } else {
+            PathBuf::from(prod_path_string)
+        };
         if !prod_path.exists() {
             exit_with_message!("The supplied path to product does not exists");
         }
@@ -71,7 +102,7 @@ impl<'a> DeclareCommandImpl<'a> {
         // add the path to the table file
         let mut table_path = prod_path.clone();
         table_path.push("ups");
-        if !prod_path.exists() {
+        if !table_path.exists() {
             exit_with_message!(format!(
                 "No ups directory found at {}",
                 table_path.to_str().expect("Unwrapping table path")
@@ -87,17 +118,23 @@ impl<'a> DeclareCommandImpl<'a> {
         let table =
             db::table::Table::from_file(product.to_string(), table_path, prod_path.clone()).ok();
 
+        let prod_dir = if relative {
+            PathBuf::from(prod_path_string)
+        } else {
+            prod_path
+        };
+
         let input = db::DeclareInputs {
             product,
-            prod_dir: &prod_path,
+            prod_dir: &prod_dir,
             version,
             tag,
             ident,
             flavor,
             table,
+            relative: self.sub_args.is_present("relative"),
         };
 
-        let db = db::DBBuilder::from_args(self.sub_args).build()?;
         let result = db.declare(vec![input], source);
         use db::DeclareResults::*;
         match result {

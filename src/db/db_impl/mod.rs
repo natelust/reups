@@ -97,4 +97,5 @@ pub struct DeclareInputs<'a> {
     pub ident: Option<&'a str>,
     pub flavor: Option<&'a str>,
     pub table: Option<Table>, // table is not used in posix database declare
+    pub relative: bool,
 }

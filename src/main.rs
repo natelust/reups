@@ -144,8 +144,11 @@ The declare options are as follows:
 * -r --root: Path to product directory to declare
 * -t --tag: Tag to add to product when declaring
 * --source: Name of source to declare product to, needed if there is more that one source that is
-writable view all with reups list --sources
+* writable view all with reups list --sources
 * --ident: Identity to assign to product when declaring
+* --relative: Allows setting a relative path for the product path, otherwise reups will record it
+* as an absolute path. If the path is to be relative it is relative to the directory containing the
+* database source it is to be declared to.
 **/
 
 extern crate reups_lib;
@@ -177,7 +180,7 @@ fn main() {
             reups::write_completions_stdout(m.value_of("shell").unwrap());
         }
         ("env", Some(m)) => {
-            reups::env_command(m, &args, & mut std::io::stdout());
+            reups::env_command(m, &args, &mut std::io::stdout());
         }
         ("declare", Some(m)) => handle_result(reups::declare_command(m, &args)),
         _ => println!("{}", args.usage()),
