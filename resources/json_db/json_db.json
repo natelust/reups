@@ -1,0 +1,228 @@
+{
+  "Versions": [
+    {
+      "QUALIFIERS": "\"\"",
+      "FLAVOR": "Linux64",
+      "UPS_DIR": "ups",
+      "DECLARED": "Tue Mar 26 11:21:26 2019",
+      "PRODUCT": "fooA",
+      "TABLE_FILE": "../test_packages/fooA/ups/fooA.table",
+      "PROD_DIR": "../test_packages/fooA",
+      "FILE": "version",
+      "VERSION": "v3",
+      "DECLARER": "nate2",
+      "IDENT": "c5e31d5915661de4393e3f1489b00ebc4497dd48"
+    },
+    {
+      "QUALIFIERS": "\"\"",
+      "FLAVOR": "Linux64",
+      "UPS_DIR": "ups",
+      "DECLARED": "Tue Mar 26 10:51:12 2019",
+      "PRODUCT": "fooA",
+      "TABLE_FILE": "../test_packages/fooA/ups/fooA.table",
+      "PROD_DIR": "../test_packages/fooA",
+      "FILE": "version",
+      "VERSION": "v1",
+      "DECLARER": "nate2",
+      "IDENT": "5a6df720540c20d95d530d3fd6885511223d5d20"
+    },
+    {
+      "QUALIFIERS": "\"\"",
+      "FLAVOR": "Linux64",
+      "UPS_DIR": "ups",
+      "DECLARED": "Tue Mar 26 11:20:34 2019",
+      "PRODUCT": "fooA",
+      "TABLE_FILE": "../test_packages/fooA/ups/fooA.table",
+      "PROD_DIR": "../test_packages/fooA",
+      "FILE": "version",
+      "VERSION": "v2",
+      "DECLARER": "nate2",
+      "IDENT": "a1047eab1035d58682a53557e0b2a75edbfd15fd"
+    },
+    {
+      "QUALIFIERS": "\"\"",
+      "FLAVOR": "Linux64",
+      "UPS_DIR": "ups",
+      "DECLARED": "Tue Mar 26 13:41:41 2019",
+      "PRODUCT": "fooB",
+      "TABLE_FILE": "../test_packages/fooB/ups/fooB.table",
+      "PROD_DIR": "../test_packages/fooB",
+      "FILE": "version",
+      "VERSION": "v1",
+      "DECLARER": "nate2",
+      "IDENT": "5a6df720540c20d95d530d3fd6885511223d5d20"
+    },
+    {
+      "QUALIFIERS": "\"\"",
+      "FLAVOR": "Linux64",
+      "UPS_DIR": "ups",
+      "DECLARED": "Wed Mar 27 13:42:07 2019",
+      "PRODUCT": "fooC",
+      "TABLE_FILE": "../test_packages/fooC/ups/fooC.table",
+      "PROD_DIR": "../test_packages/fooC",
+      "FILE": "version",
+      "VERSION": "v1",
+      "DECLARER": "nate2",
+      "IDENT": "5a6df720540c20d95d530d3fd6885511223d5d20"
+    },
+    {
+      "QUALIFIERS": "\"\"",
+      "FLAVOR": "Linux64",
+      "UPS_DIR": "ups",
+      "DECLARED": "Tue Mar 26 13:42:10 2019",
+      "PRODUCT": "fooC",
+      "TABLE_FILE": "../test_packages/fooC/ups/fooC.table",
+      "PROD_DIR": "../test_packages/fooC",
+      "FILE": "version",
+      "VERSION": "v2",
+      "DECLARER": "nate2",
+      "IDENT": "a1047eab1035d58682a53557e0b2a75edbfd15fd"
+    }
+  ],
+  "Tables": [
+    {
+      "exact": {
+        "required": {
+          "fooB": "v1"
+        },
+        "optional": {
+          "fooC": "v1"
+        }
+      },
+      "inexact": {
+        "required": {
+          "fooB": ""
+        },
+        "optional": {
+          "fooC": ""
+        }
+      },
+      "env": {
+        "PATH": [
+          "Prepend",
+          "${PRODUCT_DIR}/bin"
+        ]
+      }
+    },
+    {
+      "exact": {
+        "required": {
+          "fooB": "v1"
+        },
+        "optional": {
+          "fooC": "v1"
+        }
+      },
+      "inexact": {
+        "required": {
+          "fooB": ""
+        },
+        "optional": {
+          "fooC": ""
+        }
+      },
+      "env": {
+        "PATH": [
+          "Prepend",
+          "${PRODUCT_DIR}/bin"
+        ]
+      }
+    },
+    {
+      "exact": {
+        "required": {
+          "fooB": "v1"
+        },
+        "optional": {
+          "fooC": "v1"
+        }
+      },
+      "inexact": {
+        "required": {
+          "fooB": ""
+        },
+        "optional": {
+          "fooC": ""
+        }
+      },
+      "env": {
+        "PATH": [
+          "Prepend",
+          "${PRODUCT_DIR}/bin"
+        ]
+      }
+    },
+    {
+      "exact": {
+        "required": {
+          "fooC": "v1"
+        },
+        "optional": {}
+      },
+      "inexact": {
+        "required": {
+          "fooC": ""
+        },
+        "optional": {}
+      },
+      "env": {}
+    },
+    {
+      "exact": {
+        "required": {},
+        "optional": {}
+      },
+      "inexact": {
+        "required": {},
+        "optional": {}
+      },
+      "env": {}
+    },
+    {
+      "exact": {
+        "required": {},
+        "optional": {}
+      },
+      "inexact": {
+        "required": {},
+        "optional": {}
+      },
+      "env": {}
+    }
+  ],
+  "Tags": [
+    {
+      "QUALIFIERS": "\"\"",
+      "FLAVOR": "Linux64",
+      "DECLARED": "Tue Mar 26 11:21:26 2019",
+      "TAG": "current",
+      "PRODUCT": "fooA",
+      "CHAIN": "",
+      "FILE": "version",
+      "VERSION": "v3",
+      "DECLARER": "nate2"
+    },
+    {
+      "QUALIFIERS": "\"\"",
+      "FLAVOR": "Linux64",
+      "DECLARED": "Tue Mar 26 13:41:41 2019",
+      "TAG": "current",
+      "PRODUCT": "fooB",
+      "CHAIN": "",
+      "FILE": "version",
+      "VERSION": "v1",
+      "DECLARER": "nate2"
+    },
+    {
+      "QUALIFIERS": "\"\"",
+      "FLAVOR": "Linux64",
+      "DECLARED": "Tue Mar 26 13:42:10 2019",
+      "TAG": "current",
+      "PRODUCT": "fooC",
+      "CHAIN": "",
+      "FILE": "version",
+      "VERSION": "v2",
+      "DECLARER": "nate2"
+    }
+  ]
+}
