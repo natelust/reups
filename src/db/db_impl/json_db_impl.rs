@@ -7,7 +7,6 @@
  * json_db_impl is a backend database source for the main DB class. It
  * stores all of the information about products in a single file.
  **/
-
 use super::DBImpl;
 use super::FnvHashMap;
 use super::PathBuf;
@@ -112,6 +111,8 @@ impl JsonDBImpl {
         let _ = json_file_raw.unlock();
         Ok(json_db)
     }
+
+    pub fn update_paths(&mut self) {}
 }
 
 // Deserialize trait, used to load an object from disk
@@ -133,11 +134,19 @@ impl<'de> Deserialize<'de> for JsonDBImpl {
             let product = version_info.remove("PRODUCT").unwrap();
             let version = version_info.remove("VERSION").unwrap();
             let ident = version_info.remove("IDENT").unwrap();
+            let product_dir = PathBuf::from(version_info.get("PROD_DIR").as_ref().unwrap());
             // Create a new table object to populate
+            /*
+            for entry in &mut table_info.env {
+                let tup = entry.1;
+                tup.1 = tup
+                    .1
+                    .replace("${PRODUCT_DIR}", product_dir.to_str().unwrap());
+            }*/
             let new_table = super::Table {
                 name: product.clone(),
                 path: None,
-                product_dir: PathBuf::from(version_info.get("PROD_DIR").unwrap().clone()),
+                product_dir,
                 exact: Some(super::table::Deps {
                     required: table_info.exact.required,
                     optional: table_info.exact.optional,
@@ -271,7 +280,11 @@ impl Serialize for JsonDBImpl {
                 }
                 let mut env_var_new = FnvHashMap::default();
                 for (k, (t, p)) in in_memory_table.env_var {
-                    env_var_new.insert(k.clone(), (t.clone(), p));
+                    let new_p = p.replace(
+                        in_memory_table.product_dir.to_str().unwrap(),
+                        "${PRODUCT_DIR}",
+                    );
+                    env_var_new.insert(k.clone(), (t.clone(), new_p));
                 }
                 new_table.env = env_var_new;
                 tables.push(new_table);
@@ -302,12 +315,30 @@ impl super::DBImpl for JsonDBImpl {
     make_db_source_default_methods!();
 
     fn get_table(&self, product: &str, version: &str) -> Option<Table> {
-        Some(
-            self.product_to_version_table
-                .get(product)?
-                .get(version)?
-                .clone(),
-        )
+        let mut table = self
+            .product_to_version_table
+            .get(product)?
+            .get(version)?
+            .clone();
+        if table.product_dir.is_relative() {
+            table.product_dir = self
+                .location
+                .parent()
+                .expect("Problem finding json db location parent")
+                .join(table.product_dir)
+                .canonicalize()
+                .expect("Problem expanding json table location to abs path");
+        }
+        for (_, entry) in &mut table.env_var {
+            entry.1 = entry.1.replace(
+                "${PRODUCT_DIR}",
+                table
+                    .product_dir
+                    .to_str()
+                    .expect("convert table product_dir to stri"),
+            );
+        }
+        Some(table)
     }
 
     fn is_writable(&self) -> bool {
@@ -403,10 +434,15 @@ impl super::DBImpl for JsonDBImpl {
             version_map.insert("DECLARER".to_string(), user.clone());
             version_map.insert("DECLARED".to_string(), date.clone());
             version_map.insert("QUALIFIERS".to_string(), "".to_string());
-            let abs_prod_dir = input
-                .prod_dir
-                .canonicalize()
-                .expect("problem building absolute path for declared product");
+            let abs_prod_dir = if input.relative {
+                crate::warn!("Declaring product with relative path, assumed to be relative to db source path");
+                input.prod_dir.clone()
+            } else {
+                input
+                    .prod_dir
+                    .canonicalize()
+                    .expect("problem building absolute path for declared product")
+            };
             version_map.insert(
                 "PROD_DIR".to_string(),
                 abs_prod_dir
