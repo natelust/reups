@@ -8,7 +8,10 @@
  used by the reups application. Any application wishing to make use of reups functionality should link to this
  library.
 */
+// allow unused import for error, it is not currently used,
+// but bring it in so it can be used
 #[doc(hidden)]
+#[allow(unused_imports)]
 use log::{debug, error, info, warn};
 #[doc(hidden)]
 use regex;
