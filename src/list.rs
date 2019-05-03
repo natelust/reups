@@ -259,7 +259,7 @@ impl<'a, W: Write> ListImpl<'a, W> {
                                     };
                                     acc + &name + ", "
                                 })
-                                .trim_right_matches(", ")
+                                .trim_end_matches(", ")
                         )
                         .as_str()
                         .trim(),
@@ -290,7 +290,7 @@ impl<'a, W: Write> ListImpl<'a, W> {
                                 };
                                 acc + name + ", "
                             })
-                            .trim_right_matches(", ")
+                            .trim_end_matches(", ")
                     )
                     .as_str()
                     .trim(),
