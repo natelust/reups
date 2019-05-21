@@ -231,6 +231,30 @@ impl<'a> Graph<'a> {
         self._processed.insert(top.clone());
     }
 
+    pub fn dfs_post_order(
+        &self,
+        node_name: &str,
+    ) -> Result<
+        Box<
+            petgraph::visit::WalkerIter<
+                petgraph::visit::DfsPostOrder<
+                    <petgraph::Graph<NodeType, String> as petgraph::visit::GraphBase>::NodeId,
+                    <petgraph::Graph<NodeType, String> as petgraph::visit::Visitable>::Map,
+                >,
+                &petgraph::Graph<NodeType, String>,
+            >,
+        >,
+        String,
+    > {
+        let node_id = self
+            ._name_map
+            .get(node_name)
+            .ok_or(format!("No product named {}", node_name))?;
+        Ok(Box::new(
+            petgraph::visit::DfsPostOrder::new(&self._graph, node_id.clone()).iter(&self._graph),
+        ))
+    }
+
     /// Iterates though the nodes of the graph
     pub fn iter(
         &self,
