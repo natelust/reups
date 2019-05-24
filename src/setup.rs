@@ -140,6 +140,7 @@ fn setup_table(
         let output_var = match v {
             (table::EnvActionType::Prepend, var) => [var.clone(), existing_var].join(":"),
             (table::EnvActionType::Append, var) => [existing_var, var.clone()].join(":"),
+            (table::EnvActionType::Set, var) => var.to_string(),
         };
 
         // Add the altered string back into the hash map of all env vars

@@ -28,6 +28,7 @@ lazy_static::lazy_static! {
     static ref ENV_PREPEND: Regex = Regex::new(r"(envPrepend|pathPrepend)[(](?P<var>.+?)[,]\s(?P<target>.+?)[)]").unwrap();
     // Finds variables to be appended to an environment variable
     static ref ENV_APPEND: Regex = Regex::new(r"(envAppend|pathAppend)[(](?P<var>.+?)[,]\s(?P<target>.+?)[)]").unwrap();
+    static ref ENV_SET: Regex = Regex::new(r"(envSet)[(](?P<var>.+?)[,]\s(?P<target>.+?)[)]").unwrap();
 }
 
 /// VersionType is an enum that differentiates between dependency trees that have
@@ -45,6 +46,7 @@ pub enum VersionType {
 pub enum EnvActionType {
     Prepend,
     Append,
+    Set,
 }
 
 /// Deps describes if a product is a required or optional dependency. Required
@@ -99,11 +101,15 @@ impl Table {
             inexact
         );
         let mut env_var = FnvHashMap::default();
-        let env_re_vec: Vec<&Regex> = vec![&*ENV_PREPEND, &*ENV_APPEND];
-        for (re, action) in env_re_vec
-            .iter()
-            .zip([EnvActionType::Prepend, EnvActionType::Append].iter())
-        {
+        let env_re_vec: Vec<&Regex> = vec![&*ENV_PREPEND, &*ENV_APPEND, &*ENV_SET];
+        for (re, action) in env_re_vec.iter().zip(
+            [
+                EnvActionType::Prepend,
+                EnvActionType::Append,
+                EnvActionType::Set,
+            ]
+            .iter(),
+        ) {
             for cap in re.captures_iter(contents.as_str()) {
                 let var = String::from(&cap["var"]);
                 let target = String::from(&cap["target"]);
