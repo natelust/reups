@@ -75,9 +75,12 @@ pub fn path_string_to_vec(path_string: &str) -> Result<Vec<PathBuf>, String> {
 /// character. This function will return the first database path, as it should be the most
 /// recently added to the environment.
 pub fn get_eups_path_from_env() -> Result<Vec<PathBuf>, String> {
-    let env_var = env::var("EUPS_PATH").unwrap_or_else(|e| {
-        exit_with_message!(format!("Problem loading eups path: {}", e));
-    });
+    let env_var = match env::var("EUPS_PATH") {
+        Ok(x) => x,
+        Err(e) => {
+            return Err(format!("Problem loading eups path: {}", e));
+        }
+    };
     crate::debug!("Found {} in environment variable", env_var);
     let system_paths_option = path_string_to_vec(env_var.as_str());
     match system_paths_option {
