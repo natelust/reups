@@ -81,6 +81,7 @@ pub struct DBBuilder {
     db_sources: FnvHashMap<String, PathBuf>,
     extra_id: u32,
     load_control: Option<DBLoadControl>,
+    allow_empty: bool,
 }
 
 type BuildBundle = Result<DBBuilder, String>;
@@ -93,6 +94,7 @@ impl DBBuilder {
             db_sources: FnvHashMap::default(),
             extra_id: 0,
             load_control: Some(DBLoadControl::All),
+            allow_empty: false,
         })
     }
 
@@ -118,6 +120,7 @@ pub trait DBBuilderTrait {
     fn add_path_vec(self, path_vec: Vec<PathBuf>) -> BuildBundle;
     fn add_path(self, pth: PathBuf) -> BuildBundle;
     fn set_load_control(self, mode: DBLoadControl) -> BuildBundle;
+    fn allow_empty(self, x: bool) -> BuildBundle;
     fn build(self) -> Result<DB, String>;
 }
 
@@ -162,11 +165,27 @@ impl DBBuilderTrait for BuildBundle {
         Ok(me)
     }
 
+    fn allow_empty(self, x: bool) -> BuildBundle {
+        let mut me = self?;
+        me.allow_empty = x;
+        Ok(me)
+    }
+
     fn build(self) -> Result<DB, String> {
         let mut db_dict = FnvHashMap::<String, Box<db_impl::DBImpl>>::default();
         let me = self?;
         if me.eups_env {
-            let eups_env_path = cogs::get_eups_path_from_env();
+            let eups_env_path_result = cogs::get_eups_path_from_env();
+            let eups_env_path = match eups_env_path_result {
+                Err(e) => {
+                    if me.allow_empty {
+                        vec![]
+                    } else {
+                        return Err(e);
+                    }
+                }
+                Ok(x) => x,
+            };
             for pth in eups_env_path.iter() {
                 crate::debug!(
                     "Adding {} to databases",

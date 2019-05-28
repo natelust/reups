@@ -74,17 +74,15 @@ pub fn path_string_to_vec(path_string: &str) -> Result<Vec<PathBuf>, String> {
 /// If EUPS_PATH contains more than one database path, they should be seperated by a pipe
 /// character. This function will return the first database path, as it should be the most
 /// recently added to the environment.
-pub fn get_eups_path_from_env() -> Vec<PathBuf> {
+pub fn get_eups_path_from_env() -> Result<Vec<PathBuf>, String> {
     let env_var = env::var("EUPS_PATH").unwrap_or_else(|e| {
         exit_with_message!(format!("Problem loading eups path: {}", e));
     });
     crate::debug!("Found {} in environment variable", env_var);
     let system_paths_option = path_string_to_vec(env_var.as_str());
     match system_paths_option {
-        Ok(system_paths) => system_paths,
-        Err(_) => {
-            exit_with_message!("Problem loading eups paths from env");
-        }
+        Ok(system_paths) => Ok(system_paths),
+        Err(_) => Err("Problem loading eups paths from env".to_string()),
     }
 }
 
