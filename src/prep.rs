@@ -19,6 +19,16 @@ pub fn build_prep_string() -> &'static str {
     fi;
 };
 
+runsetup() {
+    local _args=\"$*\";
+    if [[ $_args = *\"-h\"* ]] || [[ $_args = *\"--help\"* ]];
+    then
+        reups setup \"$@\";
+    else
+        eval $(reups setup -u $_args);
+    fi;
+}
+
 rrestore() {
 eval $(reups env restore \"$@\");
 };

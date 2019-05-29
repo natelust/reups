@@ -37,6 +37,7 @@ fn setup_table(
     keep: bool,
     flavor: &String,
     db_path: PathBuf,
+    unsetup: bool,
 ) {
     // set the setup env var
     let mut setup_var = String::from("SETUP_");
@@ -80,11 +81,16 @@ fn setup_table(
         product_table.name,
         product_version
     );
-    env_vars.insert(
-        prod_dir_label,
-        String::from(product_table.product_dir.to_str().unwrap()),
-    );
-    env_vars.insert(setup_var, setup_string_vec.join("\\ "));
+    if unsetup {
+        let _ = env_vars.remove(&prod_dir_label);
+        let _ = env_vars.remove(&setup_var);
+    } else {
+        env_vars.insert(
+            prod_dir_label,
+            String::from(product_table.product_dir.to_str().unwrap()),
+        );
+        env_vars.insert(setup_var, setup_string_vec.join("\\ "));
+    }
 
     // iterate over all environment variables, values in the supplied table
     for (k, v) in product_table.env_var.iter() {
@@ -134,17 +140,18 @@ fn setup_table(
                 existing_var.replace_range(start_pos..end_pos, "");
             }
         }
+        if !unsetup {
+            // check the action type and appropriately add the new value onto the env variable
+            // under investigation in this loop
+            let output_var = match v {
+                (table::EnvActionType::Prepend, var) => [var.clone(), existing_var].join(":"),
+                (table::EnvActionType::Append, var) => [existing_var, var.clone()].join(":"),
+                (table::EnvActionType::Set, var) => var.to_string(),
+            };
 
-        // check the action type and appropriately add the new value onto the env variable
-        // under investigation in this loop
-        let output_var = match v {
-            (table::EnvActionType::Prepend, var) => [var.clone(), existing_var].join(":"),
-            (table::EnvActionType::Append, var) => [existing_var, var.clone()].join(":"),
-            (table::EnvActionType::Set, var) => var.to_string(),
-        };
-
-        // Add the altered string back into the hash map of all env vars
-        env_vars.insert(k.clone(), output_var);
+            // Add the altered string back into the hash map of all env vars
+            env_vars.insert(k.clone(), output_var);
+        }
     }
 }
 
@@ -381,7 +388,15 @@ pub fn setup_command<W: Write>(
 
         // Keep should always be false for the first product to setup, as this is the
         // directory the user specified, so clearly they want to set it up.
-        setup_table(&version, &table, &mut env_vars, false, &flavor, db_path);
+        setup_table(
+            &version,
+            &table,
+            &mut env_vars,
+            false,
+            &flavor,
+            db_path,
+            sub_args.is_present("unsetup"),
+        );
 
         // If there are dependencies, then set them up as well
         if let Some(dependencies) = deps {
@@ -423,6 +438,7 @@ pub fn setup_command<W: Write>(
                             keep,
                             &flavor,
                             db_path,
+                            sub_args.is_present("unsetup"),
                         )
                     }
                     (None, true) => continue,

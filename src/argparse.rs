@@ -46,6 +46,12 @@ pub fn build_setup<'a, 'b>() -> App<'a, 'b> {
                 .help("Run setup with Inexact versions as specified in the table files")
                 .short("E")
                 .long("inexact"),
+        )
+        .arg(
+            Arg::with_name("unsetup")
+                .help("Unsetup a product instead of setting it up")
+                .short("u")
+                .long("unsetup"),
         );
 }
 
