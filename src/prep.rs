@@ -27,7 +27,7 @@ runsetup() {
     else
         eval $(reups setup -u $_args);
     fi;
-}
+};
 
 rrestore() {
 eval $(reups env restore \"$@\");
