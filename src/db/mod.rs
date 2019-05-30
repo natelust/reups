@@ -501,7 +501,7 @@ impl DB {
     }
 
     /// Look up if a given product exists in the database
-    pub fn has_product(&self, product: &String) -> bool {
+    pub fn has_product(&self, product: &str) -> bool {
         // iterate over the global and user db
         for (_, db) in self.iter() {
             if db.has_product(product) {
@@ -512,7 +512,7 @@ impl DB {
     }
 
     /// Look up if a given product exists in the database
-    pub fn has_identity(&self, product: &String, id: &String) -> bool {
+    pub fn has_identity(&self, product: &str, id: &str) -> bool {
         // iterate over the global and user db
         for (_, db) in self.iter() {
             if db.has_identity(product, id) {
