@@ -332,6 +332,16 @@ impl DB {
         product_tags
     }
 
+    pub fn get_table_from_identity(&self, product: &str, id: &str) -> Option<table::Table> {
+        for (_, db) in self.iter() {
+            if db.has_identity(product, id) {
+                let version = db.lookup_version_ident(product, id)?;
+                return self.get_table_from_version(product, version);
+            }
+        }
+        None
+    }
+
     /// Looks up the table corresponding to the product, version combination specified.
     pub fn get_table_from_version(&self, product: &str, version: &str) -> Option<table::Table> {
         crate::debug!("Getting table from version {}", version);
@@ -495,6 +505,17 @@ impl DB {
         // iterate over the global and user db
         for (_, db) in self.iter() {
             if db.has_product(product) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Look up if a given product exists in the database
+    pub fn has_identity(&self, product: &String, id: &String) -> bool {
+        // iterate over the global and user db
+        for (_, db) in self.iter() {
+            if db.has_identity(product, id) {
                 return true;
             }
         }
