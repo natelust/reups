@@ -472,7 +472,7 @@ pub fn setup_command<W: Write>(
         env_vars.insert(reups_history_key, reups_history_string);
         // Process all the environment variables into a string to return
         let mut return_string = String::from("export ");
-        let mut unset_string = String::from("; ");
+        let mut unset_string = String::from("");
         for (k, v) in env_vars {
             match v.as_str() {
                 "UNSET" => unset_string.push_str(&format!("unset {} ", k)),
@@ -482,7 +482,10 @@ pub fn setup_command<W: Write>(
                 }
             }
         }
-        return_string.push_str(unset_string.as_str());
+        if unset_string.chars().count() > 0 {
+            return_string.push_str("; ");
+            return_string.push_str(unset_string.as_str());
+        }
         let _ = writer.write(format!("{}\n", return_string).as_bytes());
     } else {
         return Err(
