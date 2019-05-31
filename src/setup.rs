@@ -30,7 +30,7 @@ use crate::table;
 /// * env_vars: HashMap of environment variables with keys equal to the variable name, and values
 /// equal to the value of the variable.
 /// * keep: bool that controls if this should overwirte a product which already exists in the environment or not
-fn setup_table(
+pub fn setup_table(
     product_version: &String,
     product_table: &table::Table,
     env_vars: &mut FnvHashMap<String, String>,
