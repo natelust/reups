@@ -283,11 +283,40 @@ pub fn setup_command<W: Write>(
     _main_args: &argparse::ArgMatches,
     writer: &mut W,
 ) -> Result<(), String> {
+    let env_vars = make_setup_env_map(sub_args, None)?;
+    // Process all the environment variables into a string to return
+    let mut return_string = String::from("export ");
+    let mut unset_string = String::from("");
+    for (k, v) in env_vars {
+        match v.as_str() {
+            "UNSET" => unset_string.push_str(&format!("unset {} ", k)),
+            _ => {
+                return_string.push_str([k, v].join("=").as_str());
+                return_string.push_str(" ");
+            }
+        }
+    }
+    if unset_string.chars().count() > 0 {
+        return_string.push_str("; ");
+        return_string.push_str(unset_string.as_str());
+    }
+    let _ = writer.write(format!("{}\n", return_string).as_bytes());
+    Ok(())
+}
+
+pub fn make_setup_env_map(
+    sub_args: &argparse::ArgMatches,
+    db: Option<db::DB>,
+) -> Result<FnvHashMap<String, String>, String> {
     // Here we will process any of the global arguments in the future but for now there is
     // nothing so we do nothing but create the database. The global arguments might affect
     // construction in the future
     logger::build_logger(sub_args, std::io::stderr());
-    let db = db::DBBuilder::from_args(sub_args).build()?;
+    // if no db was passed in, create one from the sub_args
+    let db = match db {
+        Some(db) => db,
+        None => db::DBBuilder::from_args(sub_args).build()?,
+    };
 
     // We process local arguments here to set the state that will be used to setup a product
     // Create a vector for the tags to consider
@@ -470,28 +499,11 @@ pub fn setup_command<W: Write>(
         let reups_history_key = String::from("REUPS_HISTORY");
         // insert into the in memory map of environment variables to values
         env_vars.insert(reups_history_key, reups_history_string);
-        // Process all the environment variables into a string to return
-        let mut return_string = String::from("export ");
-        let mut unset_string = String::from("");
-        for (k, v) in env_vars {
-            match v.as_str() {
-                "UNSET" => unset_string.push_str(&format!("unset {} ", k)),
-                _ => {
-                    return_string.push_str([k, v].join("=").as_str());
-                    return_string.push_str(" ");
-                }
-            }
-        }
-        if unset_string.chars().count() > 0 {
-            return_string.push_str("; ");
-            return_string.push_str(unset_string.as_str());
-        }
-        let _ = writer.write(format!("{}\n", return_string).as_bytes());
+        Ok(env_vars)
     } else {
         return Err(
             "Error, no product to setup, please specify product or path to table with -r"
                 .to_string(),
         );
     }
-    Ok(())
 }
