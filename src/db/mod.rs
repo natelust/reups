@@ -524,13 +524,13 @@ impl DB {
 
     /// Declares a new product to the database
     pub fn declare(
-        self,
+        &mut self,
         inputs: Vec<db_impl::DeclareInputs>,
         source: Option<&str>,
     ) -> DeclareResults {
         let source_name = if let Some(src) = source {
             if !self.database_map.contains_key(src) {
-                return DeclareResults::NoSource(self);
+                return DeclareResults::NoSource;
             }
             if !self
                 .database_map
@@ -544,7 +544,7 @@ impl DB {
             {
                 src.to_string()
             } else {
-                return DeclareResults::NoneWritable(self);
+                return DeclareResults::NoneWritable;
             }
         } else {
             let mut write_set: Vec<String> = vec![];
@@ -555,33 +555,32 @@ impl DB {
             }
             crate::debug!("found {} writable db sources", write_set.len());
             match write_set.len() {
-                0 => return DeclareResults::NoneWritable(self),
+                0 => return DeclareResults::NoneWritable,
                 1 => write_set.remove(0),
-                _ => return DeclareResults::MultipleWriteable(self),
+                _ => return DeclareResults::MultipleWriteable,
             }
         };
 
-        let mut this = self;
-        let active_db = this.database_map.remove(&source_name).unwrap();
+        let active_db = self.database_map.remove(&source_name).unwrap();
         crate::debug!("Adding input into database source {}", source_name);
         let new_result = active_db.declare(&inputs);
         match new_result {
             Err((new, msg)) => {
-                this.database_map.insert(source_name.clone(), new);
-                return DeclareResults::Error(this, source_name, msg);
+                self.database_map.insert(source_name.clone(), new);
+                return DeclareResults::Error(source_name, msg);
             }
             Ok(new) => {
-                this.database_map.insert(source_name.clone(), new);
-                return DeclareResults::Success(this, source_name);
+                self.database_map.insert(source_name.clone(), new);
+                return DeclareResults::Success(source_name);
             }
         }
     }
 }
 
 pub enum DeclareResults {
-    MultipleWriteable(DB),
-    NoneWritable(DB),
-    Success(DB, String),
-    Error(DB, String, String),
-    NoSource(DB),
+    MultipleWriteable,
+    NoneWritable,
+    Success(String),
+    Error(String, String),
+    NoSource,
 }

@@ -58,7 +58,7 @@ impl<'a> DeclareCommandImpl<'a> {
     }
 
     fn run(&mut self) -> Result<(), String> {
-        let db = db::DBBuilder::from_args(self.sub_args).build()?;
+        let mut db = db::DBBuilder::from_args(self.sub_args).build()?;
         // see if the user wants to specify product path relative to db location
         let relative = self.sub_args.is_present("relative");
         let prod_path_string = self.sub_args.value_of("path").unwrap();
@@ -138,19 +138,19 @@ impl<'a> DeclareCommandImpl<'a> {
         let result = db.declare(vec![input], source);
         use db::DeclareResults::*;
         match result {
-            NoSource(_) => {
+            NoSource => {
                 exit_with_message!("No source found with supplied name");
             }
-            NoneWritable(_) => {
+            NoneWritable => {
                 exit_with_message!("No writable source found");
             }
-            MultipleWriteable(_) => {
+            MultipleWriteable => {
                 exit_with_message!("More than one writable db found, specify source with --source");
             }
-            Error(_, name, msg) => {
+            Error(name, msg) => {
                 exit_with_message!(format!("Problem declaring to {}, check that version, and optionally tag and ident are not already declared. Error message: {}", name, msg));
             }
-            Success(_, name) => {
+            Success(name) => {
                 crate::info!("Wrote declared product {} to source {}", product, name);
             }
         }
