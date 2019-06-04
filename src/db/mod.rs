@@ -577,6 +577,7 @@ impl DB {
     }
 }
 
+#[derive(Debug)]
 pub enum DeclareResults {
     MultipleWriteable,
     NoneWritable,
