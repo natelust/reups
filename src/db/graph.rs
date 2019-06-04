@@ -6,8 +6,6 @@
 pub extern crate petgraph;
 use fnv::FnvHashMap;
 
-use std::collections::HashSet;
-
 use crate::db::graph::petgraph::visit::Walker;
 use crate::db::table;
 use crate::db::DB;
@@ -39,25 +37,31 @@ impl fmt::Debug for NodeType {
 /// Graph is a structure that holds the relational information between products, and
 /// has methods to add products to the relational graph
 #[derive(Debug)]
-pub struct Graph<'a> {
+pub struct Graph {
     _graph: petgraph::Graph<NodeType, String>,
     _name_map: FnvHashMap<String, petgraph::graph::NodeIndex<petgraph::graph::DefaultIx>>,
     _index_map: FnvHashMap<petgraph::graph::NodeIndex<petgraph::graph::DefaultIx>, String>,
-    _db: &'a DB,
-    _processed: HashSet<String>,
 }
 
-impl<'a> Graph<'a> {
+pub struct GraphDBHelper<'a> {
+    pub graph: &'a mut Graph,
+    pub db: &'a DB,
+}
+
+impl Graph {
     /// Created a new graph that will be associated with the specified database
-    pub fn new(db: &'a DB) -> Graph {
+    pub fn new() -> Graph {
         Graph {
             _graph: petgraph::Graph::<NodeType, String>::new(),
             _name_map: FnvHashMap::default(),
             _index_map: FnvHashMap::default(),
-            _db: db,
-            _processed: HashSet::new(),
         }
     }
+
+    pub fn make_db_helper<'a>(&'a mut self, db: &'a DB) -> GraphDBHelper<'a> {
+        GraphDBHelper { db, graph: self }
+    }
+
     /// Resolves the index of a graph node into a string of the product name at that node
     pub fn get_name(
         &self,
@@ -134,103 +138,6 @@ impl<'a> Graph<'a> {
         Ok(())
     }
 
-    /// Add a product to the graph specified by a given tag. This tag is looked up in the database
-    /// associated with this graph and resolved into a table file. Optionally add in the dependencies from the table file if recurse is true
-    pub fn add_product_by_tag(
-        &mut self,
-        product: String,
-        tag: &Vec<&str>,
-        version_type: table::VersionType,
-        node_type: NodeType,
-        recurse: bool,
-    ) {
-        if !self._processed.contains(&product) {
-            let result = self._db.get_table_from_tag(&product, tag);
-            if let Some(table) = result {
-                self.add_table(&table, version_type, node_type, Some(tag), recurse);
-            }
-        }
-    }
-
-    /// Add a product to the graph specified by a given version. This version is looked up in the database
-    /// associated with this graph and resolved into a table file. Optionally add in the
-    /// dependencies from the table file if recurse is true
-    pub fn add_product_by_version(
-        &mut self,
-        product: String,
-        version: String,
-        version_type: table::VersionType,
-        node_type: NodeType,
-        recurse: bool,
-    ) {
-        if !self._processed.contains(&product) {
-            let result = self._db.get_table_from_version(&product, &version);
-            if let Some(table) = result {
-                self.add_table(&table, version_type, node_type, None, recurse);
-            }
-        }
-    }
-
-    /// Add a specific table into the graph of products. Optionally add in the
-    /// dependencies from the table file if recurse is true
-    pub fn add_table(
-        &mut self,
-        table: &table::Table,
-        version_type: table::VersionType,
-        node_type: NodeType,
-        tag: Option<&Vec<&str>>,
-        recurse: bool,
-    ) {
-        let top = &table.name;
-
-        self.add_or_update_product(top.clone(), node_type);
-
-        let dependencies = match version_type {
-            table::VersionType::Exact => table.exact.as_ref(),
-            table::VersionType::Inexact => table.inexact.as_ref(),
-        };
-        // This means that there are no dependencies of the required type, and so the function
-        // should return.
-        if let None = dependencies {
-            crate::debug!("No dependencies found for {}", top);
-            return;
-        }
-        // If there are dependencies for the version type, loop over the required and optional
-        // dependencies
-        let dep_unwrap = dependencies.unwrap();
-        crate::debug!("{} has dependencies of {:?}", top, dep_unwrap);
-        for (dep_vec, node_type) in vec![&dep_unwrap.required, &dep_unwrap.optional]
-            .iter()
-            .zip(vec![NodeType::Required, NodeType::Optional])
-        {
-            for (k, v) in dep_vec.iter() {
-                self.add_or_update_product(k.clone(), node_type.clone());
-                if let Err(_) = self.connect_products(top, &k, v.clone()) {
-                    crate::warn!("There was an issue connecting products in the graph, topological walks my be incorrect");
-                }
-
-                match (&version_type, tag, recurse) {
-                    (table::VersionType::Inexact, Some(tag_vec), true) => self.add_product_by_tag(
-                        k.clone(),
-                        tag_vec,
-                        table::VersionType::Inexact,
-                        node_type.clone(),
-                        recurse,
-                    ),
-                    (table::VersionType::Exact, _, true) => self.add_product_by_version(
-                        k.clone(),
-                        v.clone(),
-                        table::VersionType::Exact,
-                        node_type.clone(),
-                        recurse,
-                    ),
-                    _ => {}
-                }
-            }
-        }
-        self._processed.insert(top.clone());
-    }
-
     pub fn dfs_post_order(
         &self,
         node_name: &str,
@@ -267,5 +174,104 @@ impl<'a> Graph<'a> {
     > {
         let topo = petgraph::visit::Topo::new(&self._graph);
         return topo.iter(&self._graph);
+    }
+}
+
+impl<'a> GraphDBHelper<'a> {
+    /// Add a product to the graph specified by a given tag. This tag is looked up in the database
+    /// associated with this graph and resolved into a table file. Optionally add in the dependencies from the table file if recurse is true
+    pub fn add_product_by_tag(
+        &mut self,
+        product: String,
+        tag: &Vec<&str>,
+        version_type: table::VersionType,
+        node_type: NodeType,
+        recurse: bool,
+    ) {
+        if !self.graph.has_product(&product) {
+            let result = self.db.get_table_from_tag(&product, tag);
+            if let Some(table) = result {
+                self.add_table(&table, version_type, node_type, Some(tag), recurse);
+            }
+        }
+    }
+
+    /// Add a product to the graph specified by a given version. This version is looked up in the database
+    /// associated with this graph and resolved into a table file. Optionally add in the
+    /// dependencies from the table file if recurse is true
+    pub fn add_product_by_version(
+        &mut self,
+        product: String,
+        version: String,
+        version_type: table::VersionType,
+        node_type: NodeType,
+        recurse: bool,
+    ) {
+        if !self.graph.has_product(&product) {
+            let result = self.db.get_table_from_version(&product, &version);
+            if let Some(table) = result {
+                self.add_table(&table, version_type, node_type, None, recurse);
+            }
+        }
+    }
+
+    /// Add a specific table into the graph of products. Optionally add in the
+    /// dependencies from the table file if recurse is true
+    pub fn add_table(
+        &mut self,
+        table: &table::Table,
+        version_type: table::VersionType,
+        node_type: NodeType,
+        tag: Option<&Vec<&str>>,
+        recurse: bool,
+    ) {
+        let top = &table.name;
+
+        self.graph.add_or_update_product(top.clone(), node_type);
+
+        let dependencies = match version_type {
+            table::VersionType::Exact => table.exact.as_ref(),
+            table::VersionType::Inexact => table.inexact.as_ref(),
+        };
+        // This means that there are no dependencies of the required type, and so the function
+        // should return.
+        if let None = dependencies {
+            crate::debug!("No dependencies found for {}", top);
+            return;
+        }
+        // If there are dependencies for the version type, loop over the required and optional
+        // dependencies
+        let dep_unwrap = dependencies.unwrap();
+        crate::debug!("{} has dependencies of {:?}", top, dep_unwrap);
+        for (dep_vec, node_type) in vec![&dep_unwrap.required, &dep_unwrap.optional]
+            .iter()
+            .zip(vec![NodeType::Required, NodeType::Optional])
+        {
+            for (k, v) in dep_vec.iter() {
+                self.graph
+                    .add_or_update_product(k.clone(), node_type.clone());
+                if let Err(_) = self.graph.connect_products(top, &k, v.clone()) {
+                    crate::warn!("There was an issue connecting products in the graph, topological walks my be incorrect");
+                }
+
+                match (&version_type, tag, recurse) {
+                    (table::VersionType::Inexact, Some(tag_vec), true) => self.add_product_by_tag(
+                        k.clone(),
+                        tag_vec,
+                        table::VersionType::Inexact,
+                        node_type.clone(),
+                        recurse,
+                    ),
+                    (table::VersionType::Exact, _, true) => self.add_product_by_version(
+                        k.clone(),
+                        v.clone(),
+                        table::VersionType::Exact,
+                        node_type.clone(),
+                        recurse,
+                    ),
+                    _ => {}
+                }
+            }
+        }
     }
 }

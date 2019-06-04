@@ -394,8 +394,9 @@ pub fn make_setup_env_map(
         // If someone specified the just flag, don't look up any dependencies
         let mut deps: Option<db::graph::Graph> = None;
         if !sub_args.is_present("just") {
-            let mut dep_graph = db::graph::Graph::new(&db);
-            dep_graph.add_table(
+            let mut dep_graph = db::graph::Graph::new();
+            let mut dep_graph_db = dep_graph.make_db_helper(&db);
+            dep_graph_db.add_table(
                 &table,
                 mode,
                 db::graph::NodeType::Required,
