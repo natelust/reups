@@ -42,7 +42,7 @@ pub enum VersionType {
 
 /// Enum to describ the action of an environment variable, prepend or append to the
 /// env var.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum EnvActionType {
     Prepend,
     Append,
@@ -51,7 +51,7 @@ pub enum EnvActionType {
 
 /// Deps describes if a product is a required or optional dependency. Required
 /// dependencies will cause the application to abort if they are not present
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Deps {
     pub required: FnvHashMap<String, String>,
     pub optional: FnvHashMap<String, String>,
@@ -127,6 +127,62 @@ impl Table {
         })
     }
 
+    pub fn to_file(&self, filename: &str) -> Result<(), String> {
+        let mut contents = "".to_string();
+        contents.push_str("if (type == exact) {\n");
+        if self.exact.is_some() {
+            for (k, v) in self.exact.as_ref().unwrap().required.iter() {
+                contents.push_str(&format!("   setupRequired({}             -j {})\n", k, v));
+            }
+            for (k, v) in self.exact.as_ref().unwrap().optional.iter() {
+                contents.push_str(&format!("   setupOptional({}             -j {})\n", k, v));
+            }
+        }
+        contents.push_str("} else {\n");
+        if self.inexact.is_some() {
+            for (k, v) in self.inexact.as_ref().unwrap().required.iter() {
+                contents.push_str(&format!("   setupRequired({} {} [>= {}])\n", k, v, v));
+            }
+            for (k, v) in self.inexact.as_ref().unwrap().optional.iter() {
+                contents.push_str(&format!("   setupOptional({} {} [>= {}])\n", k, v, v));
+            }
+        }
+        contents.push_str("}\n");
+        let prod_dir_string = self
+            .product_dir
+            .to_str()
+            .ok_or_else(|| return "Cant convert product dir to string".to_string())?;
+        for (var, (action, target)) in self.env_var.iter() {
+            match action {
+                EnvActionType::Prepend => contents.push_str(&format!(
+                    "envPrepend({}, {})\n",
+                    var,
+                    target.replace(prod_dir_string, "${PRODUCT_DIR}")
+                )),
+                EnvActionType::Append => contents.push_str(&format!(
+                    "envAppend({}, {})\n",
+                    var,
+                    target.replace(prod_dir_string, "${PRODUCT_DIR}")
+                )),
+                EnvActionType::Set => contents.push_str(&format!(
+                    "envSet({}, {})\n",
+                    var,
+                    target.replace(prod_dir_string, "${PRODUCT_DIR}")
+                )),
+            }
+        }
+        // write out the file to disk
+        let mut f = std::fs::OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(filename)
+            .or_else(|e| return Err(format!("{}", e)))?;
+        f.write(contents.as_bytes())
+            .or_else(|e| return Err(format!("{}", e)))?;
+        Ok(())
+    }
+
     /// Extracts the part of the table file that is related to the dependencies of the
     /// table file
     fn extract_setup(input: &str, re: &Regex) -> Option<Deps> {
@@ -155,3 +211,11 @@ impl Table {
         })
     }
 }
+
+impl PartialEq for Table {
+    fn eq(&self, other: &Self) -> bool {
+        self.exact == other.exact && self.inexact == other.inexact && self.env_var == other.env_var
+    }
+}
+
+impl Eq for Table {}

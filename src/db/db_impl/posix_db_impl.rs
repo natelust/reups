@@ -11,6 +11,7 @@ use super::Table;
 use crate::regex;
 use crypto::digest::Digest;
 use crypto::sha1::Sha1;
+use std::cell::RefCell;
 use std::fs;
 use std::path;
 use std::sync::mpsc;
@@ -47,7 +48,11 @@ End:
 ";
 
 /// Database back end source that uses a posix file system to store information
-make_db_source_struct!(PosixDBImpl, DBFile);
+make_db_source_struct!(
+    PosixDBImpl,
+    DBFile,
+    table_cache: RefCell<FnvHashMap<(String, String), Table>>
+);
 
 impl PosixDBImpl {
     /// Creates a new Posix database source given a filesystem location, and optionally
@@ -64,18 +69,21 @@ impl PosixDBImpl {
             let mut product_to_ident = FnvHashMap::<String, Vec<String>>::default();
             let mut product_ident_version =
                 FnvHashMap::<String, FnvHashMap<String, String>>::default();
-            product_to_info.iter().for_each(|(product, version_vec)| {
+            product_to_info.iter().for_each(|(product, version_map)| {
                 let mut idents = vec![];
                 let mut ident_versions = FnvHashMap::<String, String>::default();
-                version_vec.keys().for_each(|version| {
-                    let found = ident_regex.as_ref().unwrap().find(version);
+                for (version, dbfile) in version_map.iter() {
+                    let found = ident_regex
+                        .as_ref()
+                        .unwrap()
+                        .find(dbfile.get("VERSION").unwrap());
                     if found.is_some() {
                         let ident =
                             version[found.unwrap().start()..(found.unwrap().end() + 1)].to_string();
                         idents.push(ident.clone());
                         ident_versions.insert(ident, version.clone());
                     }
-                });
+                }
                 product_to_ident.insert(product.clone(), idents);
                 product_ident_version.insert(product.clone(), ident_versions);
             });
@@ -90,6 +98,7 @@ impl PosixDBImpl {
             product_to_tags,
             product_to_ident,
             product_ident_version,
+            table_cache: RefCell::new(FnvHashMap::default()),
         })
     }
 
@@ -268,6 +277,21 @@ impl super::DBImpl for PosixDBImpl {
 
     /// Returns a table corresponding to a given product and version
     fn get_table(&self, product: &str, version: &str) -> Option<Table> {
+        let prod_string = product.to_string();
+        let vers_string = version.to_string();
+        {
+            if self
+                .table_cache
+                .borrow()
+                .contains_key(&(prod_string.clone(), vers_string.clone()))
+            {
+                return self
+                    .table_cache
+                    .borrow()
+                    .get(&(prod_string, vers_string))
+                    .cloned();
+            }
+        }
         let db_file = self.product_to_version_info.get(product)?.get(version)?;
         let prod_dir = db_file.get(&"PROD_DIR")?;
         let mut ups_dir = db_file.get(&"UPS_DIR")?;
@@ -296,6 +320,11 @@ impl super::DBImpl for PosixDBImpl {
             complete.to_str().unwrap()
         );
         let table = Table::from_file(product.to_owned(), complete, complete_only_path).ok();
+        if table.is_some() {
+            self.table_cache
+                .borrow_mut()
+                .insert((prod_string, vers_string), table.as_ref().unwrap().clone());
+        }
         table
     }
 
@@ -391,13 +420,14 @@ impl super::DBImpl for PosixDBImpl {
             table_file.push(ups_dir);
             table_file.push(format!("{}{}", input.product, ".table"));
             let mut version_map = FnvHashMap::default();
-            let version = if let Some(id) = input.ident {
+            let version_dbfile = if let Some(id) = input.ident {
                 format!("{}-{}", input.version, id)
             } else {
                 input.version.to_string()
             };
+            let version = input.version.to_string();
             version_map.insert("product", input.product);
-            version_map.insert("version", version.as_str());
+            version_map.insert("version", version_dbfile.as_str());
             version_map.insert("flavor", flav);
             version_map.insert("user", user.as_str());
             version_map.insert("date", date.as_str());
@@ -434,8 +464,15 @@ impl super::DBImpl for PosixDBImpl {
                 .entry(version.clone())
                 .or_insert(DBFile::new_with_contents(version_dir, version_contents));
 
+            if let Some(tbl) = &input.table {
+                self.table_cache
+                    .borrow_mut()
+                    .insert((input.product.to_string(), version.clone()), tbl.clone());
+            }
+
             if let Some(tg) = input.tag {
                 version_map.insert("tag", tg);
+                version_map.insert("version", &version);
                 let tag_contents = self.format_tag_file(&version_map);
                 let mut tag_dir = local_base_dir.clone();
                 tag_dir.push(format!("{}.chain", tg));
@@ -549,6 +586,37 @@ impl super::DBImpl for PosixDBImpl {
                     let version_contents = self.format_version_dbfile(v);
                     crate::debug!("Syncing version {} file for {} to disk", k, product);
                     fs::write(version_dir, version_contents)?;
+                }
+                if let Some(tbl) = self
+                    .table_cache
+                    .borrow()
+                    .get(&(product.to_string(), k.to_string()))
+                {
+                    crate::debug!(
+                        "Table for {} version {} exists in cache, checking if it needs saved",
+                        product,
+                        k
+                    );
+                    let product_dir = PathBuf::from(v.get("PROD_DIR").unwrap());
+                    let mut table_dir = product_dir.clone();
+                    table_dir.push("ups");
+                    table_dir.push(format!("{}.table", product));
+                    let on_disk_table = super::Table::from_file(
+                        product.to_string(),
+                        table_dir.clone(),
+                        product_dir,
+                    );
+                    if &on_disk_table? != tbl {
+                        crate::debug!(
+                            "In memory table is different than on disk, saving table to disk"
+                        );
+                        tbl.to_file(table_dir.to_str().unwrap()).or_else(|e| {
+                            return Err(std::io::Error::new(
+                                std::io::ErrorKind::Other,
+                                format!("{}", e),
+                            ));
+                        })?;
+                    }
                 }
             }
         } else {
