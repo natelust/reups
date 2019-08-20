@@ -28,7 +28,7 @@ macro_rules! make_db_source_default_methods {
     }
 
     fn get_products(&self) -> Vec<&str> {
-        self.product_to_tags.keys().map(|a| a.as_str()).collect()
+        self.product_to_version_info.keys().map(|a| a.as_str()).collect()
     }
 
     fn lookup_flavor_version(&self, product: &str, version: &str) -> Option<&str> {

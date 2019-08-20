@@ -65,7 +65,7 @@ fooC                                            v2          [\u{1b}[96mcurrent\u
 #[test]
 fn test_list_only_vers() {
     let args = vec!["reups", "list", "-U", "-S", "--onlyVers", "-Z"];
-    let expected = "fooA                               [v3, v1, v2]
+    let expected = "fooA                               [v1, v2, v3]
 
 fooB                               [v1]
 
@@ -77,7 +77,7 @@ fooC                               [v1, v2]
 #[test]
 fn test_list_only_vers_json() {
     let args = vec!["reups", "list", "-U", "-S", "--onlyVers", "-Z"];
-    let expected = "fooA                               [v3, v1, v2]
+    let expected = "fooA                               [v1, v2, v3]
 
 fooB                               [v1]
 

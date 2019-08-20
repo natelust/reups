@@ -65,7 +65,7 @@ impl TableInfoJson {
     }
 }
 
-/// Database backend source that stores data in a single json file
+// Database backend source that stores data in a single json file
 make_db_source_struct!(JsonDBImpl,
                       FnvHashMap<String, String>,
                       product_to_version_table: FnvHashMap<String, FnvHashMap<String, Table>>);
@@ -218,28 +218,30 @@ impl Serialize for JsonDBImpl {
         // populate the structures
         for (product, version_map) in self.product_to_version_info.iter() {
             // lets process tags first
-            for tag in self.product_to_tags[product].iter() {
-                // a given tag may not be associated with the product under
-                // consideration, so verify the mapping contains this product
-                if self
-                    .tag_to_product_info
-                    .get(tag)
-                    .unwrap()
-                    .contains_key(product)
-                {
-                    // Fetch the associated tag mapping
-                    let mut tag_info = self
+            if self.product_to_tags.contains_key(product) {
+                for tag in self.product_to_tags[product].iter() {
+                    // a given tag may not be associated with the product under
+                    // consideration, so verify the mapping contains this product
+                    if self
                         .tag_to_product_info
                         .get(tag)
                         .unwrap()
-                        .get(product)
-                        .unwrap()
-                        .clone();
-                    // insert product and tag info into the mapping so the info
-                    // will be available to use in deserializing
-                    tag_info.insert("PRODUCT".to_string(), product.clone());
-                    tag_info.insert("TAG".to_string(), tag.clone());
-                    tags.push(tag_info);
+                        .contains_key(product)
+                    {
+                        // Fetch the associated tag mapping
+                        let mut tag_info = self
+                            .tag_to_product_info
+                            .get(tag)
+                            .unwrap()
+                            .get(product)
+                            .unwrap()
+                            .clone();
+                        // insert product and tag info into the mapping so the info
+                        // will be available to use in deserializing
+                        tag_info.insert("PRODUCT".to_string(), product.clone());
+                        tag_info.insert("TAG".to_string(), tag.clone());
+                        tags.push(tag_info);
+                    }
                 }
             }
             // now for versions
@@ -576,6 +578,7 @@ impl super::DBImpl for JsonDBImpl {
 
         // As the in memory and on disk representations might differ, only add
         // to the read in object so others work can not be forgotten
+
         if self.product_to_tags.contains_key(product) {
             crate::debug!("Syncing tags for product {}", product);
             for tag in &self.product_to_tags[product] {
@@ -602,6 +605,9 @@ impl super::DBImpl for JsonDBImpl {
                     .or_insert(vec![])
                     .push(tag.clone());
             }
+        }
+        if self.product_to_version_info.contains_key(product) {
+            crate::debug!("Syncing versions for product {}", product);
             let new_product_map = json_db
                 .product_to_version_info
                 .entry(product.to_string())
@@ -624,6 +630,7 @@ impl super::DBImpl for JsonDBImpl {
                 new_table_map.insert(version.clone(), old_table_map.get(version).unwrap().clone());
             }
 
+            crate::debug!("Syncing identities for product {}", product);
             let new_ident_map = json_db
                 .product_ident_version
                 .as_mut()
@@ -652,20 +659,20 @@ impl super::DBImpl for JsonDBImpl {
             }
         }
 
+        crate::debug!("Serializing out the json db");
         // serialized the json_db out to a string before writing
         let serialized_json_db = match serde_json::to_string_pretty(&json_db) {
             Ok(x) => x,
-            Err(e) => {
-                dbg!(e);
+            Err(_) => {
                 return Err(Error::new(
                     ErrorKind::Other,
                     format!("Issue serializing back to json representation\n"),
                 ));
             }
         };
-
         let _ = json_file.write(serialized_json_db.as_bytes())?;
         json_file.unlock()?;
+        crate::debug!("Done syncing out the database");
         Ok(())
     }
 }

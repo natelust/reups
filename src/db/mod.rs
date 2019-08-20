@@ -78,6 +78,8 @@ pub enum DBLoadControl {
 pub struct DBBuilder {
     eups_env: bool,
     eups_user: bool,
+    reups_env: bool,
+    reups_user: bool,
     db_sources: FnvHashMap<String, PathBuf>,
     extra_id: u32,
     load_control: Option<DBLoadControl>,
@@ -91,10 +93,12 @@ impl DBBuilder {
         Ok(DBBuilder {
             eups_env: true,
             eups_user: true,
+            reups_env: true,
+            reups_user: true,
             db_sources: FnvHashMap::default(),
             extra_id: 0,
             load_control: Some(DBLoadControl::All),
-            allow_empty: false,
+            allow_empty: true,
         })
     }
 
@@ -102,9 +106,11 @@ impl DBBuilder {
         let mut db = DBBuilder::new();
         if args.is_present("nouser") {
             db = db.add_eups_user(false);
+            db = db.add_reups_user(false);
         }
         if args.is_present("nosys") {
             db = db.add_eups_env(false);
+            db = db.add_reups_env(false);
         }
         if args.is_present("database") {
             db = db.add_path_str(args.value_of("database").unwrap());
@@ -116,6 +122,8 @@ impl DBBuilder {
 pub trait DBBuilderTrait {
     fn add_eups_env(self, x: bool) -> BuildBundle;
     fn add_eups_user(self, x: bool) -> BuildBundle;
+    fn add_reups_env(self, x: bool) -> BuildBundle;
+    fn add_reups_user(self, x: bool) -> BuildBundle;
     fn add_path_str(self, path_str: &str) -> BuildBundle;
     fn add_path_vec(self, path_vec: Vec<PathBuf>) -> BuildBundle;
     fn add_path(self, pth: PathBuf) -> BuildBundle;
@@ -134,6 +142,18 @@ impl DBBuilderTrait for BuildBundle {
     fn add_eups_user(self, x: bool) -> BuildBundle {
         let mut me = self?;
         me.eups_user = x;
+        Ok(me)
+    }
+
+    fn add_reups_env(self, x: bool) -> BuildBundle {
+        let mut me = self?;
+        me.reups_env = x;
+        Ok(me)
+    }
+
+    fn add_reups_user(self, x: bool) -> BuildBundle {
+        let mut me = self?;
+        me.reups_user = x;
         Ok(me)
     }
 
@@ -212,7 +232,7 @@ impl DBBuilderTrait for BuildBundle {
         };
         // Handle the user paths
         if me.eups_user {
-            let eups_user_path = cogs::get_user_path_from_home();
+            let eups_user_path = cogs::get_eups_user_db();
             if eups_user_path.is_some() {
                 let pth = eups_user_path.unwrap();
                 crate::debug!(
@@ -227,6 +247,57 @@ impl DBBuilderTrait for BuildBundle {
                 db_dict.insert(database_name.clone(), Box::new(user_db));
             }
         };
+        if me.reups_env {
+            let reups_env_path_result = cogs::get_reups_path_from_env();
+            let reups_env_path = match reups_env_path_result {
+                Err(e) => {
+                    if me.allow_empty {
+                        vec![]
+                    } else {
+                        return Err(e);
+                    }
+                }
+                Ok(x) => x,
+            };
+            for pth in reups_env_path.iter() {
+                crate::debug!(
+                    "Adding {} to databases",
+                    pth.to_str().expect("Malformed database string")
+                );
+                let temp_db = match db_impl::JsonDBImpl::new(&pth) {
+                    Ok(x) => x,
+                    Err(msg) => return Err(msg),
+                };
+                // expect should be safe here, as we pushed a directory on previously
+                // Format the database map name in a deterministic way with the last bit of the path
+                let db_name = format!(
+                    "json_system_{}",
+                    pth.parent()
+                        .expect("Problem with database path after stripping file")
+                        .file_name()
+                        .expect("There was a problem getting the final directory in database path")
+                        .to_str()
+                        .expect("Problem turning directory osString to str")
+                );
+                db_dict.insert(db_name.clone(), Box::new(temp_db));
+            }
+        }
+        if me.reups_user {
+            let reups_user_path = cogs::get_reups_user_db();
+            if reups_user_path.is_some() {
+                let pth = reups_user_path.unwrap();
+                crate::debug!(
+                    "Adding {} to databases",
+                    pth.clone().to_str().expect("Malformed database string")
+                );
+                let user_db = match db_impl::JsonDBImpl::from_file(&pth) {
+                    Ok(x) => x,
+                    Err(msg) => return Err(format!("{}", msg)),
+                };
+                let database_name = String::from("json_user");
+                db_dict.insert(database_name, Box::new(user_db));
+            }
+        }
         // Handle any other paths that were added
         for (name, pth) in me.db_sources.iter() {
             let extension = pth.extension();

@@ -47,7 +47,7 @@ Group:
 End:
 ";
 
-/// Database back end source that uses a posix file system to store information
+// Database back end source that uses a posix file system to store information
 make_db_source_struct!(
     PosixDBImpl,
     DBFile,

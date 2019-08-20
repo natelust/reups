@@ -12,9 +12,15 @@ location within the `reups_lib` library. The main library re-exports this
 module, so end users of `reups_lib` should see all functions exposed there.
 */
 
+use app_dirs;
 use dirs;
 use std::env;
 use std::path::PathBuf;
+
+const APP_INFO: app_dirs::AppInfo = app_dirs::AppInfo {
+    name: "reups",
+    author: "Reups Community",
+};
 
 // Determine the system on which this comand is run. In eups past there used to be
 // more flavors (i.e. just linux) but these systems are almost never used and are
@@ -72,8 +78,7 @@ pub fn path_string_to_vec(path_string: &str) -> Result<Vec<PathBuf>, String> {
 /// Returns the eups system path as determined from the EUPS_PATH environment variable.
 ///
 /// If EUPS_PATH contains more than one database path, they should be seperated by a pipe
-/// character. This function will return the first database path, as it should be the most
-/// recently added to the environment.
+/// character.
 pub fn get_eups_path_from_env() -> Result<Vec<PathBuf>, String> {
     let env_var = match env::var("EUPS_PATH") {
         Ok(x) => x,
@@ -90,7 +95,7 @@ pub fn get_eups_path_from_env() -> Result<Vec<PathBuf>, String> {
 }
 
 /// Returns the path to a user database, defined in users home directory, if one is present.
-pub fn get_user_path_from_home() -> Option<PathBuf> {
+pub fn get_eups_user_db() -> Option<PathBuf> {
     let user_home = dirs::home_dir();
     let mut user_path = user_home?;
     user_path.push(".eups/ups_db");
@@ -99,4 +104,40 @@ pub fn get_user_path_from_home() -> Option<PathBuf> {
     } else {
         None
     }
+}
+
+/// Returns the reups paths as determined from REUPS_PATH environment variable.
+/// This should point to json db source files.
+///
+/// If REUPS_PATH contains more than one database path, they should be seperated by a pipe
+/// character.
+pub fn get_reups_path_from_env() -> Result<Vec<PathBuf>, String> {
+    let env_var = match env::var("REUPS_PATH") {
+        Ok(x) => x,
+        Err(e) => {
+            return Err(format!("Problem loading eups path: {}", e));
+        }
+    };
+    crate::debug!("Found {} in environment variable", env_var);
+    let system_paths_option = path_string_to_vec(env_var.as_str());
+    match system_paths_option {
+        Ok(system_paths) => Ok(system_paths),
+        Err(_) => Err("Problem loading eups paths from env".to_string()),
+    }
+}
+
+/// Returns the path to a user database, defined in users home directory, if one is present.
+pub fn get_reups_user_db() -> Option<PathBuf> {
+    let user_data = app_dirs::app_root(app_dirs::AppDataType::UserData, &APP_INFO);
+    let mut user_path = match user_data {
+        Ok(x) => x,
+        Err(_) => {
+            crate::error!(
+                "There was a problem determining the user app directory on this platform"
+            );
+            return None;
+        }
+    };
+    user_path.push("reups_user_db.json");
+    Some(user_path)
 }

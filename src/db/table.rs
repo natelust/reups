@@ -12,10 +12,6 @@ use std::io;
 use std::io::prelude::*;
 use std::path;
 
-/**!
- A Table object is the in memory representation of a products table file.
-*/
-
 lazy_static::lazy_static! {
     // Regexes to capture information out of the text of a table file
     // captures exact dependency trees
@@ -30,6 +26,10 @@ lazy_static::lazy_static! {
     static ref ENV_APPEND: Regex = Regex::new(r"(envAppend|pathAppend)[(](?P<var>.+?)[,]\s(?P<target>.+?)[)]").unwrap();
     static ref ENV_SET: Regex = Regex::new(r"(envSet)[(](?P<var>.+?)[,]\s(?P<target>.+?)[)]").unwrap();
 }
+
+/**!
+ A Table object is the in memory representation of a products table file.
+*/
 
 /// VersionType is an enum that differentiates between dependency trees that have
 /// explicit exact versions sepecified, or if specific versions will be determined
