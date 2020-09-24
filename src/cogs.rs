@@ -139,5 +139,9 @@ pub fn get_reups_user_db() -> Option<PathBuf> {
         }
     };
     user_path.push("reups_user_db.json");
-    Some(user_path)
+    if (user_path.exists()) {
+        Some(user_path)
+    } else {
+        None
+    }
 }
