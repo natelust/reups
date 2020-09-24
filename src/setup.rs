@@ -366,16 +366,7 @@ pub fn make_setup_env_map(
             let mut version = String::from("");
             if table.is_some() {
                 let mut tmp = String::from("LOCAL:");
-                tmp.push_str(
-                    table
-                        .as_ref()
-                        .unwrap()
-                        .path
-                        .as_ref()
-                        .unwrap()
-                        .to_str()
-                        .unwrap(),
-                );
+                tmp.push_str(table.as_ref().unwrap().product_dir.to_str().unwrap());
                 version = tmp
             }
             mode = table::VersionType::Inexact;
