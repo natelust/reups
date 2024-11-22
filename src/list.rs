@@ -130,7 +130,9 @@ impl<'a, W: Write> ListImpl<'a, W> {
     fn run_product(&mut self) {
         // If the user specified a specific product only generate output for that product
         let mut product_vec = if self.sub_args.is_present("product") {
-            vec![self.sub_args.value_of("product").unwrap().to_string()]
+            let mut prods = vec![self.sub_args.value_of("product").unwrap().to_string()];
+            if self.sub_args.is_present("dependencies") || self.sub_args.is_present("overries") {}
+            prods
         }
         // If the user specifed they want only setup products, get the list of those to display
         else if self.sub_args.is_present("setup") {

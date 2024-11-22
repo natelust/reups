@@ -15,7 +15,7 @@ pub fn build_prep_string() -> &'static str {
     then
         reups setup \"$@\";
     else
-        eval $(reups setup $_args);
+        eval $(reups setup \"$@\");
     fi;
 };
 

@@ -122,7 +122,11 @@ impl<'a, W: Write> EnvCommandImpl<'a, W> {
                 }
                 if s == "y" || s == "Y" {
                     crate::warn!("Creating new env store");
-                    preferences::PreferencesMap::<Vec<String>>::new()
+                    let new_env = preferences::PreferencesMap::<Vec<String>>::new();
+                    new_env
+                        .save(&APP_INFO, PREF_KEY)
+                        .expect("There was a problem saving the current env");
+                    new_env
                 } else {
                     exit_with_message!("No env store found or created, exiting");
                 }
@@ -150,8 +154,23 @@ impl<'a, W: Write> EnvCommandImpl<'a, W> {
             "restore" => self.run_restore(),
             "delete" => self.run_delete(),
             "list" => self.run_list(),
+            "show" => self.run_show(),
             _ => (),
         }
+    }
+
+    /** Shows what commands have been executed in the current environment
+     **/
+    fn run_show(&mut self) {
+        self.writer
+            .write(
+                format!(
+                    "Commands executed in the current shell:\n{:#?}\n",
+                    self.current_commands.clone()
+                )
+                .as_bytes(),
+            )
+            .expect("There was a problem writing current environment to the writer");
     }
 
     /** Saves any commands that were executed in the current environment

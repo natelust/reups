@@ -12,11 +12,17 @@ use clap::{App, Arg, SubCommand};
 */
 pub fn build_setup<'a, 'b>() -> App<'a, 'b> {
     return SubCommand::with_name("setup")
-        .arg(Arg::with_name("product").help("Product to setup").index(1))
+        .arg(
+            Arg::with_name("product")
+                .help("Product to setup")
+                .required(false)
+                .index(1),
+        )
         .arg(
             Arg::with_name("just")
                 .help("ignore dependncies")
                 .short("j")
+                .takes_value(false)
                 .long("just"),
         )
         .arg(
@@ -87,11 +93,21 @@ fn build_list<'a, 'b>() -> App<'a, 'b> {
                                .help("Only list products that are setup as local products")
                                .short("l")
                                .long("local")
-                               .conflicts_with_all(&["product", "setup", "sources"]))
+                               .conflicts_with_all(&["product", "setup", "sources", "dependencies", "overrides"]))
                           .arg(Arg::with_name("sources")
                                .help("List identifier and path of all the sources that went into the database")
                                .long("sources")
-                               .conflicts_with_all(&["product", "setup", "local"]));
+                               .conflicts_with_all(&["product", "setup", "local", "dependencies", "overrides"]))
+                          .arg(Arg::with_name("dependencies")
+                               .help("List any dependency to specified product")
+                               .long("dependencies")
+                               .short("d")
+                               .conflicts_with_all(&["setup", "local", "sources", "overrides" ]))
+                          .arg(Arg::with_name("overrides")
+                               .help("List any dependency overrides applied to specified product")
+                               .long("overrides")
+                               .short("o")
+                               .conflicts_with_all(&["setup", "local", "sources", "dependencies" ]));
 }
 
 /**
@@ -118,7 +134,7 @@ fn build_env<'a, 'b>() -> App<'a, 'b> {
         .arg(
             Arg::with_name("command")
                 .required(true)
-                .possible_values(&["save", "restore", "delete", "list"])
+                .possible_values(&["save", "restore", "delete", "list", "show"])
                 .help("Action to take for a given environment, to restore you most likely want to use the rrestore shell function"),
         )
         .arg(
